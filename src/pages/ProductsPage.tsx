@@ -44,6 +44,14 @@ const EDIT_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
     label: 'Display on Web',
     type: 'toggle',
     description: 'Enable to show game on store frontend; toggle off to set disabled/hidden flag.',
+    defaultValue: false
+  },
+  {
+    name: 'isDenuvo',
+    label: 'Denuvo',
+    type: 'toggle',
+    description: 'Toggle if this game belongs to Denuvo DRM',
+    defaultValue: false
   },
 ];
 
@@ -176,6 +184,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     await loadProducts(true); // Force refresh on toggle
   };
 
+  const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
+    await onUpdateProduct(product.id, { isDenuvo: !currentDenuvo });
+    await loadProducts(true); // Force refresh on toggle
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Action & Search Bar */}
@@ -205,6 +218,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <TableHead>Game Info</TableHead>
             <TableHead>Prices (VND / USD / CNY)</TableHead>
             <TableHead>Web Status</TableHead>
+            <TableHead>Denuvo</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -251,6 +265,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <Badge variant={!product.isDelete ? 'active' : 'disabled'}>
                       {!product.isDelete ? 'Displayed on Web' : 'Disabled (Hidden)'}
                     </Badge>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={product.isDenuvo}
+                      onCheckedChange={() => handleToggleDenuvo(product, product.isDenuvo)}
+                    />
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -342,6 +364,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 prices: editingProduct.pricing,
                 imageUrl: editingProduct.imageUrl,
                 disabled: !editingProduct.isDelete,
+                isDenuvo: editingProduct.isDenuvo
               }}
               onSubmit={handleEditSubmit}
               onCancel={() => setEditingProduct(null)}
