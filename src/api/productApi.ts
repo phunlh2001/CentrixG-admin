@@ -1,5 +1,4 @@
 import type {
-  BaseResponse,
   PaginatedResponse,
   Product,
   ProductQueryParams,
@@ -8,14 +7,7 @@ import type {
   RawProductResponse,
   MultiCurrencyPrice,
 } from '@/types';
-import { axiosClient } from './axiosClient';
-
-function unwrapResponse<T>(json: BaseResponse<T> | T): T {
-  if (json && typeof json === 'object' && json !== null && 'data' in json && (json as BaseResponse<T>).data !== undefined) {
-    return (json as BaseResponse<T>).data;
-  }
-  return json as T;
-}
+import { axiosClient, unwrapResponse } from './axiosClient';
 
 function mapRawToProduct(rawData: RawProductResponse, fallback?: Partial<Product>): Product {
   let pricing: MultiCurrencyPrice;
@@ -37,17 +29,21 @@ function mapRawToProduct(rawData: RawProductResponse, fallback?: Partial<Product
     id: rawData.id || fallback?.id || '',
     name: rawData.name || fallback?.name || '',
     pricing,
-    isDelete: rawData.isDelete,
+    isDelete: rawData.isDelete ?? fallback?.isDelete ?? false,
+    disabled: rawData.disabled ?? fallback?.disabled ?? false,
     categories: rawData.categories || fallback?.categories || [],
     imageUrl: rawData.imageUrl || fallback?.imageUrl || '',
     createdAt: rawData.createdAt || fallback?.createdAt || new Date().toISOString(),
-    isDenuvo: rawData.isDenuvo,
+    isDenuvo: rawData.isDenuvo ?? fallback?.isDenuvo ?? false,
     publisher: rawData.publisher || fallback?.publisher || '',
+    type: rawData.type
   };
 }
 
 export class ProductApi {
   private readonly _endpoint: string;
+  private _inFlightGetAll: Map<string, Promise<PaginatedResponse<Product>>> = new Map();
+
   constructor() {
     this._endpoint = '/products';
   }
@@ -55,6 +51,13 @@ export class ProductApi {
   async getAll(params?: ProductQueryParams): Promise<PaginatedResponse<Product>> {
     const page = params?.page ?? 1;
     const pageSize = params?.pageSize ?? 10;
+    const search = params?.search ?? '';
+
+    const cacheKey = `${search}_${page}_${pageSize}`;
+
+    if (this._inFlightGetAll.has(cacheKey)) {
+      return this._inFlightGetAll.get(cacheKey)!;
+    }
 
     const queryParams = new URLSearchParams({
       includeHidden: 'true',
@@ -62,12 +65,21 @@ export class ProductApi {
       pageSize: String(pageSize),
     });
 
-    if (params?.search) {
-      queryParams.append('search', params.search);
+    if (search) {
+      queryParams.append('search', search);
     }
 
-    const res = await axiosClient.get(this._endpoint, { params: queryParams });
-    return unwrapResponse(res.data);
+    const fetchPromise = (async () => {
+      try {
+        const res = await axiosClient.get(this._endpoint, { params: queryParams });
+        return unwrapResponse(res.data);
+      } finally {
+        this._inFlightGetAll.delete(cacheKey);
+      }
+    })();
+
+    this._inFlightGetAll.set(cacheKey, fetchPromise);
+    return fetchPromise;
   }
 
   async create(payload: CreateProductDto): Promise<Product> {
@@ -101,6 +113,14 @@ export class ProductApi {
       publisher: payload.publisher,
       categories: payload.categories,
     });
+  }
+
+  async updateType(id: string, category: string) {
+    const res = await axiosClient.patch(
+      `${this._endpoint}/${id}/type`, 
+      { category: category }
+    );
+    return unwrapResponse(res.data);
   }
 }
 

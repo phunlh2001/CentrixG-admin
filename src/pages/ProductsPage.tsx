@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Plus, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -16,47 +16,14 @@ interface ProductsPageProps {
   onUpdateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
 }
 
-// Edit Form Schema: Category field removed as requested
-const EDIT_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
-  {
-    name: 'name',
-    label: 'Game Title / Name',
-    type: 'text',
-    placeholder: 'e.g. Black Myth: Wukong',
-    required: true,
-  },
-  {
-    name: 'prices',
-    label: 'Rental Price & Concurrencies',
-    type: 'vnd-currency',
-    required: true,
-    description: 'Enter price in VND. USD ($) and CNY (¥) will automatically calculate.',
-  },
-  {
-    name: 'imageUrl',
-    label: 'Game Cover Image URL',
-    type: 'text',
-    placeholder: 'https://images.unsplash.com/...',
-    required: true,
-  },
-  {
-    name: 'disabled',
-    label: 'Display on Web',
-    type: 'toggle',
-    description: 'Enable to show game on store frontend; toggle off to set disabled/hidden flag.',
-    defaultValue: false
-  },
-  {
-    name: 'isDenuvo',
-    label: 'Denuvo',
-    type: 'toggle',
-    description: 'Toggle if this game belongs to Denuvo DRM',
-    defaultValue: false
-  },
+const CATEGORIES = [
+  { label: 'Rockstar', value: 'Rockstar' },
+  { label: 'Ubisoft', value: 'Ubisoft' },
+  { label: 'EA', value: 'EA' },
 ];
 
-// Create Form Schema
-const CREATE_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
+// Edit Form Schema
+const EDIT_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
   {
     name: 'name',
     label: 'Game Title / Name',
@@ -85,9 +52,55 @@ const CREATE_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
     description: 'Enable to show game on store frontend; toggle off to set disabled/hidden flag.',
     defaultValue: false,
   },
+  {
+    name: 'isDenuvo',
+    label: 'Denuvo',
+    type: 'toggle',
+    description: 'Toggle if this game belongs to Denuvo DRM',
+    defaultValue: false,
+  },
 ];
 
-export const ProductsPage: React.FC<ProductsPageProps> = ({
+// Create Form Schema
+const CREATE_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
+  {
+    name: 'name',
+    label: 'Game Title / Name',
+    type: 'text',
+    placeholder: 'e.g. Black Myth: Wukong',
+    required: true,
+  },
+  {
+    name: 'categories',
+    label: 'Categories',
+    type: 'select',
+    description: 'Categories of the game.',
+    options: CATEGORIES,
+  },
+  {
+    name: 'prices',
+    label: 'Rental Price & Concurrencies',
+    type: 'vnd-currency',
+    required: true,
+    description: 'Enter price in VND. USD ($) and CNY (¥) will automatically calculate.',
+  },
+  {
+    name: 'imageUrl',
+    label: 'Game Cover Image URL',
+    type: 'text',
+    placeholder: 'https://images.unsplash.com/...',
+    required: true,
+  },
+  {
+    name: 'disabled',
+    label: 'Display on Web',
+    type: 'toggle',
+    description: 'Enable to show game on store frontend; toggle off to set disabled/hidden flag.',
+    defaultValue: false,
+  },
+];
+
+export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
   onCreateProduct,
   onUpdateProduct,
 }) => {
@@ -95,6 +108,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const isInitialMount = useRef(true);
 
   const [paginatedData, setPaginatedData] = useState<PaginatedResponse<Product>>({
     items: [],
@@ -104,13 +118,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     totalPages: 1,
   });
   const [loading, setLoading] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debounce search input
+  // Debounce search input (skip initial mount to prevent duplicate fetch)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1); // Reset to page 1 on new search
@@ -189,6 +208,31 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     await loadProducts(true); // Force refresh on toggle
   };
 
+  const handleSelectCategory = async (product: Product, categoryName: string) => {
+    setUpdatingCategoryId(product.id);
+    // Optimistic UI update: immediately change state so UI updates without lag
+    setPaginatedData(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === product.id
+          ? {
+              ...item,
+              type: categoryName ? { id: item.type?.id || '', name: categoryName } : undefined,
+            }
+          : item
+      ),
+    }));
+
+    try {
+      await productApi.updateType(product.id, categoryName);
+    } catch (err) {
+      console.error('Failed to update product category:', err);
+      await loadProducts(true); // revert state on failure
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Action & Search Bar */}
@@ -211,7 +255,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </Button>
       </div>
 
-      {/* Products Table (Total Paid Column Removed as requested) */}
+      {/* Products Table */}
       <Table>
         <TableHeader>
           <TableRow>
@@ -219,19 +263,20 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <TableHead>Prices (VND / USD / CNY)</TableHead>
             <TableHead>Web Status</TableHead>
             <TableHead>Denuvo</TableHead>
+            <TableHead>Category / Type</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading && paginatedData.items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="h-32 text-center text-xs text-slate-400">
+              <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
                 Loading products...
               </TableCell>
             </TableRow>
           ) : paginatedData.items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="h-32 text-center text-xs text-slate-400">
+              <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
                 No products found
               </TableCell>
             </TableRow>
@@ -275,6 +320,41 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     />
                   </div>
                 </TableCell>
+                <TableCell>
+                  <div className="relative inline-block">
+                    <select
+                      disabled={updatingCategoryId === product.id}
+                      onChange={e => handleSelectCategory(product, e.target.value)}
+                      value={product.type?.name ?? ''}
+                      className={`appearance-none h-8 w-36 pl-8 pr-7 rounded-md border text-xs font-semibold cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
+                        product.type?.name === 'Rockstar'
+                          ? 'bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100/80'
+                          : product.type?.name === 'Ubisoft'
+                          ? 'bg-indigo-50/80 text-indigo-800 border-indigo-200 hover:bg-indigo-100/80'
+                          : product.type?.name === 'EA'
+                          ? 'bg-rose-50/80 text-rose-800 border-rose-200 hover:bg-rose-100/80'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <option value="" className="bg-white text-slate-600">Unassigned</option>
+                      {CATEGORIES.map(opt => (
+                        <option key={opt.value} value={opt.value} className="bg-white text-slate-900 font-medium">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      {updatingCategoryId === product.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" />
+                      ) : (
+                        <Tag className="w-3.5 h-3.5 opacity-70" />
+                      )}
+                    </div>
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                      <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                    </div>
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">
                   <Button
                     size="sm"
@@ -292,7 +372,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </TableBody>
       </Table>
 
-      {/* Pagination Footer Controls (10 items per page max) */}
+      {/* Pagination Footer Controls */}
       <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
         <div className="text-slate-500 font-medium">
           Showing <span className="font-bold text-slate-900">{paginatedData.items.length}</span> of{' '}
@@ -328,7 +408,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       </div>
 
-      {/* Create Product Modal - Expanded max-w-2xl */}
+      {/* Create Product Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -347,7 +427,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Product Modal (Category field removed, Total Paid removed) */}
+      {/* Edit Product Modal */}
       <Dialog open={Boolean(editingProduct)} onOpenChange={(open) => !open && setEditingProduct(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -376,4 +456,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       </Dialog>
     </div>
   );
-};
+});
+
+ProductsPage.displayName = 'ProductsPage';

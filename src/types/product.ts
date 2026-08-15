@@ -7,14 +7,21 @@ export interface MultiCurrencyPrice {
 export interface Product {
   id: string;
   name: string;
-  pricing?: MultiCurrencyPrice;
-  isDelete?: boolean;
+  pricing: MultiCurrencyPrice;
+  isDelete: boolean;
+  disabled?: boolean;
   categories?: string[];
   category?: string;
   imageUrl: string;
   createdAt: string;
-  isDenuvo?: boolean;
+  isDenuvo: boolean;
   publisher?: string;
+  type?: ProductType;
+}
+
+export interface ProductType {
+  id: string;
+  name: string;
 }
 
 export interface ProductQueryParams {
@@ -56,4 +63,5 @@ export interface RawProductResponse {
   createdAt?: string;
   isDenuvo?: boolean;
   publisher?: string;
+  type?: ProductType;
 }

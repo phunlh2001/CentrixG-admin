@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { CONFIG_ENV, CONFIG_STORAGE } from '@/lib/constants';
 import { getStoredAuthToken } from '@/lib/helper';
+import type { BaseResponse } from '@/types';
 
 export const axiosClient = axios.create({
   baseURL: CONFIG_ENV.API_BASE_URL,
@@ -33,3 +34,10 @@ axiosClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export function unwrapResponse<T>(json: BaseResponse<T> | T): T {
+  if (json && typeof json === 'object' && json !== null && 'data' in json && (json as BaseResponse<T>).data !== undefined) {
+    return (json as BaseResponse<T>).data;
+  }
+  return json as T;
+}

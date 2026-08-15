@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Category, DynamicFormFieldSchema } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { Input } from '@/components/ui/input';
-import { Plus, Edit2, Trash2, Search, FolderKanban } from 'lucide-react';
+import { Plus, Edit2, Search, FolderKanban, Loader2, RefreshCw } from 'lucide-react';
+import categoryApi from '@/api/categoryApi';
 
 interface CategoriesPageProps {
   categories: Category[];
   onCreateCategory: (data: Omit<Category, 'id' | 'createdAt' | 'productCount'>) => Promise<void>;
   onUpdateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
-  onDeleteCategory: (id: string) => Promise<void>;
 }
 
 const CATEGORY_FORM_SCHEMA: DynamicFormFieldSchema[] = [
@@ -31,15 +31,32 @@ const CATEGORY_FORM_SCHEMA: DynamicFormFieldSchema[] = [
 ];
 
 export const CategoriesPage: React.FC<CategoriesPageProps> = ({
-  categories,
+  categories: initialCategories,
   onCreateCategory,
   onUpdateCategory,
-  onDeleteCategory,
 }) => {
+  const [categories, setCategories] = useState<Category[]>(initialCategories || []);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const data = await categoryApi.getCategories();
+      setCategories(data);
+    } catch (err) {
+      console.error('Failed fetching categories:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, [initialCategories]);
 
   const filteredCategories = categories.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -54,6 +71,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
         description: values.description || '',
       });
       setIsCreateModalOpen(false);
+      await fetchCategories();
     } finally {
       setIsSubmitting(false);
     }
@@ -68,14 +86,9 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
         description: values.description || '',
       });
       setEditingCategory(null);
+      await fetchCategories();
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
-      await onDeleteCategory(id);
     }
   };
 
@@ -83,17 +96,29 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
     <div className="space-y-6">
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-          <Input
-            placeholder="Search categories by name or description..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-white"
-          />
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Input
+              placeholder="Search categories by name or description..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchCategories}
+            disabled={loading}
+            className="h-9 px-3 shrink-0"
+            title="Refresh Categories"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
-        <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2">
+        <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 shrink-0">
           <Plus className="w-4 h-4" />
           Create New Category
         </Button>
@@ -103,7 +128,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Category Name & Slug</TableHead>
+            <TableHead>Category Name</TableHead>
             <TableHead>Description</TableHead>
             <TableHead>Product Count</TableHead>
             <TableHead>Created At</TableHead>
@@ -111,7 +136,16 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredCategories.length === 0 ? (
+          {loading && categories.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+                  Loading categories...
+                </div>
+              </TableCell>
+            </TableRow>
+          ) : filteredCategories.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
                 No categories available
@@ -119,51 +153,42 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
             </TableRow>
           ) : (
             filteredCategories.map(cat => (
-            <TableRow key={cat.id}>
-              <TableCell className="font-medium">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
-                    <FolderKanban className="w-4 h-4" />
+              <TableRow key={cat.id}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
+                      <FolderKanban className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-slate-900 font-semibold text-sm">{cat.name}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-slate-900 font-semibold text-sm">{cat.name}</div>
-                    <div className="text-xs text-slate-400 font-mono">/{cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}</div>
+                </TableCell>
+                <TableCell className="text-xs text-slate-600 max-w-sm truncate">
+                  {cat.description || '—'}
+                </TableCell>
+                <TableCell className="text-xs font-semibold text-slate-800">
+                  {cat.productCount ?? 0} games
+                </TableCell>
+                <TableCell className="text-xs text-slate-500 font-mono">
+                  {cat.createdAt ? new Date(cat.createdAt).toLocaleDateString() : '—'}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingCategory(cat)}
+                      className="h-8 gap-1"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Edit
+                    </Button>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell className="text-xs text-slate-600 max-w-sm truncate">
-                {cat.description || '—'}
-              </TableCell>
-              <TableCell className="text-xs font-semibold text-slate-800">
-                {cat.productCount ?? 0} games
-              </TableCell>
-              <TableCell className="text-xs text-slate-500 font-mono">
-                {cat.createdAt ? new Date(cat.createdAt).toLocaleDateString() : '—'}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingCategory(cat)}
-                    className="h-8 gap-1"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(cat.id)}
-                    className="h-8 gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          )))}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
 

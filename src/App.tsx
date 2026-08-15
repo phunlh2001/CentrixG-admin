@@ -8,11 +8,13 @@ import { BillsPage } from '@/pages/BillsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { BlogPage } from '@/pages/BlogPage';
 import { LoginPage } from '@/pages/LoginPage';
-import type { Product, Bill, UserAccount, BlogPost, OverviewMetrics, Category } from '@/types';
+import type { Product, Bill, UserAccount, BlogPost, Category, OverviewMetrics } from '@/types';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import productApi from './api/productApi';
+import overviewApi from './api/overviewApi';
+import categoryApi from './api/categoryApi';
 
 function AdminDashboard() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -31,6 +33,8 @@ function AdminDashboard() {
     if (!isAuthenticated) return;
     setDataLoading(true);
     try {
+      const m = await overviewApi.getOverviewMetrics(timeframe);
+      const catList = await categoryApi.getCategories();
       // const [m, catList, bRes, u, blog] = await Promise.all([
       //   adminApi.getOverviewMetrics(timeframe),
       //   adminApi.getCategories(),
@@ -39,8 +43,8 @@ function AdminDashboard() {
       //   adminApi.getBlogPosts(),
       // ]);
 
-      // setMetrics(m);
-      // setCategories(catList);
+      setMetrics(m);
+      setCategories(catList);
       // setBills(bRes.bills);
       // setTopPayer(bRes.topPayerOfMonth);
       // setUsers(u);
@@ -91,11 +95,6 @@ function AdminDashboard() {
 
   const handleUpdateCategory = async (id: string, updates: Partial<Category>) => {
     // await adminApi.updateCategory(id, updates);
-    await loadData();
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    // await adminApi.deleteCategory(id);
     await loadData();
   };
 
@@ -173,7 +172,6 @@ function AdminDashboard() {
                   categories={categories}
                   onCreateCategory={handleCreateCategory}
                   onUpdateCategory={handleUpdateCategory}
-                  onDeleteCategory={handleDeleteCategory}
                 />
               )}
               {activeTab === 'bills' && <BillsPage bills={bills} topPayer={topPayer} />}

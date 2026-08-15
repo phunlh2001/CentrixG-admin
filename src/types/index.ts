@@ -4,5 +4,5 @@ export * from './product';
 export * from './category';
 export * from './bill';
 export * from './blog';
-export * from './metrics';
 export * from './form';
+export * from './admin-overview'
