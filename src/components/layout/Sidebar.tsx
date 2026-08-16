@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutDashboard, Package, FolderKanban, FileText, Users, Newspaper, Gamepad2 } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, FolderKanban, FileText, Users, Newspaper, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TabType = 'overview' | 'products' | 'categories' | 'bills' | 'accounts' | 'blog';
+export type TabType = 'overview' | 'products' | 'warehouse' | 'categories' | 'bills' | 'accounts' | 'blog';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -13,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'products', label: 'Products', icon: Package },
+    { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
     { id: 'categories', label: 'Categories', icon: FolderKanban },
     { id: 'bills', label: 'Bills Management', icon: FileText },
     { id: 'accounts', label: 'Accounts', icon: Users },

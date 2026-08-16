@@ -7,7 +7,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Plus, Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -147,6 +147,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         search: debouncedSearch,
         page,
         pageSize,
+        hasManifest: true,
       });
       setPaginatedData(data);
     } catch (err) {
@@ -249,10 +250,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
           </div>
         </div>
 
-        <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 shrink-0">
+        {/* <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 shrink-0">
           <Plus className="w-4 h-4" />
           Create New Product
-        </Button>
+        </Button> */}
       </div>
 
       {/* Products Table */}

@@ -3,6 +3,7 @@ import { Sidebar, type TabType } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { OverviewPage } from '@/pages/OverviewPage';
 import { ProductsPage } from '@/pages/ProductsPage';
+import { WarehousePage } from '@/pages/WarehousePage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { BillsPage } from '@/pages/BillsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
@@ -128,6 +129,7 @@ function AdminDashboard() {
   const tabTitles: Record<TabType, string> = {
     overview: 'Platform Analytics Overview',
     products: 'Product & Game Catalog Management',
+    warehouse: 'Unmanifested Warehouse Catalog',
     categories: 'Game Category Administration',
     bills: 'Financial Bills & Transactions',
     accounts: 'User & Staff Account Administration',
@@ -166,6 +168,10 @@ function AdminDashboard() {
                   onUpdateProduct={handleUpdateProduct}
                 />
               </div>
+
+              {activeTab === 'warehouse' && (
+                <WarehousePage onUpdateProduct={handleUpdateProduct} />
+              )}
 
               {activeTab === 'categories' && (
                 <CategoriesPage

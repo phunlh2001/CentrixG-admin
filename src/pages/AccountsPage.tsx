@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import type { UserAccount } from '@/types';
+import type { DynamicFormFieldSchema, UserAccount } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ShieldAlert, Mail, Ban, Search, ShieldCheck, Eye } from 'lucide-react';
+import { ShieldAlert, Mail, Ban, Search, ShieldCheck, Eye, Plus } from 'lucide-react';
+import { DynamicForm } from '@/components/ui/DynamicForm';
 
 interface AccountsPageProps {
   users: UserAccount[];
@@ -18,8 +19,25 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
   onBanUser,
   onUnbanUser,
 }) => {
+  const CATEGORY_FORM_SCHEMA: DynamicFormFieldSchema[] = [
+    {
+      name: 'name',
+      label: 'Category Name',
+      type: 'text',
+      placeholder: 'e.g. Action RPG or Open World',
+      required: true,
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      placeholder: 'Brief summary of games belonging to this category...',
+    },
+  ];
+
   const [search, setSearch] = useState('');
   const [banModalUser, setBanModalUser] = useState<UserAccount | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [banReason, setBanReason] = useState('');
   const [emailPreviewUser, setEmailPreviewUser] = useState<{ user: UserAccount; reason?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +63,20 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
     }
   };
 
+  const handleCreateSubmit = async (values: Record<string, any>) => {
+    setIsSubmitting(true);
+    // try {
+    //   await onCreateCategory({
+    //     name: values.name,
+    //     description: values.description || '',
+    //   });
+    //   setIsCreateModalOpen(false);
+    //   await fetchCategories();
+    // } finally {
+    //   setIsSubmitting(false);
+    // }
+  };
+
   return (
     <div className="space-y-6">
       {/* Search and Filters Bar */}
@@ -62,6 +94,11 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
           Showing {filteredUsers.length} total accounts (Passwords securely omitted)
         </div>
       </div>
+
+      <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 shrink-0">
+        <Plus className="w-4 h-4" />
+        Create New
+      </Button>
 
       {/* User Accounts Table */}
       <Table>
@@ -184,6 +221,25 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
               {isSubmitting ? 'Banning...' : 'Confirm Ban & Send Email'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Account Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Rental Product</DialogTitle>
+            <DialogDescription>
+              Enter product details and price in VND with auto-calculated USD and CNY rates.
+            </DialogDescription>
+          </DialogHeader>
+          <DynamicForm
+            fields={CATEGORY_FORM_SCHEMA}
+            onSubmit={handleCreateSubmit}
+            onCancel={() => setIsCreateModalOpen(false)}
+            submitText="Create Product"
+            isSubmitting={isSubmitting}
+          />
         </DialogContent>
       </Dialog>
 

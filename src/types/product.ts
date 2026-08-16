@@ -6,6 +6,8 @@ export interface MultiCurrencyPrice {
 
 export interface Product {
   id: string;
+  appId?: number;
+  hasManifest?: boolean;
   name: string;
   pricing: MultiCurrencyPrice;
   isDelete: boolean;
@@ -28,6 +30,7 @@ export interface ProductQueryParams {
   search?: string;
   page?: number;
   pageSize?: number;
+  hasManifest?: boolean;
 }
 
 export interface CreateProductDto {
@@ -54,6 +57,8 @@ export interface UpdateProductDto {
 
 export interface RawProductResponse {
   id?: string;
+  appId?: number;
+  hasManifest?: boolean;
   name?: string;
   pricing?: MultiCurrencyPrice;
   isDelete?: boolean;

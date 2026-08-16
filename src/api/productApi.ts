@@ -27,6 +27,8 @@ function mapRawToProduct(rawData: RawProductResponse, fallback?: Partial<Product
 
   return {
     id: rawData.id || fallback?.id || '',
+    appId: rawData.appId ?? fallback?.appId,
+    hasManifest: rawData.hasManifest ?? fallback?.hasManifest ?? false,
     name: rawData.name || fallback?.name || '',
     pricing,
     isDelete: rawData.isDelete ?? fallback?.isDelete ?? false,
@@ -52,8 +54,9 @@ export class ProductApi {
     const page = params?.page ?? 1;
     const pageSize = params?.pageSize ?? 10;
     const search = params?.search ?? '';
+    const hasManifestStr = params?.hasManifest !== undefined ? String(params.hasManifest) : '';
 
-    const cacheKey = `${search}_${page}_${pageSize}`;
+    const cacheKey = `${search}_${hasManifestStr}_${page}_${pageSize}`;
 
     if (this._inFlightGetAll.has(cacheKey)) {
       return this._inFlightGetAll.get(cacheKey)!;
@@ -64,6 +67,10 @@ export class ProductApi {
       page: String(page),
       pageSize: String(pageSize),
     });
+
+    if (params?.hasManifest !== undefined) {
+      queryParams.append('hasManifest', String(params.hasManifest));
+    }
 
     if (search) {
       queryParams.append('search', search);
