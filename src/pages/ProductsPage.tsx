@@ -146,8 +146,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
       const data = await productApi.getAll({
         search: debouncedSearch,
         page,
-        pageSize,
-        hasManifest: true,
+        pageSize
       });
       setPaginatedData(data);
     } catch (err) {
