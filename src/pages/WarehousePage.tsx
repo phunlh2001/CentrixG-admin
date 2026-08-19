@@ -128,8 +128,9 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     }
   };
 
-  const handleToggleDenuvo = (product: Product, isDenuvo: boolean) => {
-
+  const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
+    await onUpdateProduct(product.id, { isDenuvo: !currentDenuvo });
+    await loadWarehouseProducts(true);
   }
 
   const handleSelectCategory = async (product: Product, categoryName: string) => {
