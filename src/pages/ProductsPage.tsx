@@ -292,6 +292,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
                     />
                     <div>
                       <div className="text-slate-900 font-semibold text-sm">{product.name}</div>
+                      {product.publisher && (
+                        <div className="text-xs text-slate-400">{product.publisher}</div>
+                      )}
                     </div>
                   </div>
                 </TableCell>

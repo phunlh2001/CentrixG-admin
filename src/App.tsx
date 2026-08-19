@@ -133,7 +133,7 @@ function AdminDashboard() {
     categories: 'Game Category Administration',
     bills: 'Financial Bills & Transactions',
     accounts: 'User & Staff Account Administration',
-    blog: 'Blog & Site Announcements',
+    // blog: 'Blog & Site Announcements',
   };
 
   return (
@@ -188,14 +188,14 @@ function AdminDashboard() {
                   onUnbanUser={handleUnbanUser}
                 />
               )}
-              {activeTab === 'blog' && (
+              {/* {activeTab === 'blog' && (
                 <BlogPage
                   posts={blogPosts}
                   onCreatePost={handleCreateBlogPost}
                   onUpdatePost={handleUpdateBlogPost}
                   onDeletePost={handleDeleteBlogPost}
                 />
-              )}
+              )} */}
             </>
           )}
         </main>

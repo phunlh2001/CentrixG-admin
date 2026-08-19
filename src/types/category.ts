@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   name: string;
   description?: string;
-  productCount?: number;
+  readyCount?: number;
+  pendingCount?: number;
   createdAt?: string;
 }

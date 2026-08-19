@@ -130,8 +130,8 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
           <TableRow>
             <TableHead>Category Name</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead>Product Count</TableHead>
-            <TableHead>Created At</TableHead>
+            <TableHead>Products (Pending)</TableHead>
+            <TableHead>Products (Ready)</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -168,10 +168,10 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
                   {cat.description || '—'}
                 </TableCell>
                 <TableCell className="text-xs font-semibold text-slate-800">
-                  {cat.productCount ?? 0} games
+                  {cat.pendingCount ?? 0} games
                 </TableCell>
-                <TableCell className="text-xs text-slate-500 font-mono">
-                  {cat.createdAt ? new Date(cat.createdAt).toLocaleDateString() : '—'}
+                <TableCell className="text-xs font-semibold text-slate-800">
+                  {cat.readyCount ?? 0} games
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1.5">
