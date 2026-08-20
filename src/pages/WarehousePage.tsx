@@ -129,9 +129,28 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
   };
 
   const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
-    await onUpdateProduct(product.id, { isDenuvo: !currentDenuvo });
-    await loadWarehouseProducts(true);
-  }
+    const newDenuvo = !currentDenuvo;
+    // Optimistic UI update for Warehouse Denuvo status
+    setPaginatedData(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === product.id ? { ...item, isDenuvo: newDenuvo } : item
+      ),
+    }));
+
+    try {
+      await onUpdateProduct(product.id, { isDenuvo: newDenuvo });
+    } catch (err) {
+      console.error('Failed to update warehouse Denuvo status:', err);
+      // Revert on error
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item.id === product.id ? { ...item, isDenuvo: currentDenuvo } : item
+        ),
+      }));
+    }
+  };
 
   const handleSelectCategory = async (product: Product, categoryName: string) => {
     setUpdatingCategoryId(product.id);

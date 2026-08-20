@@ -198,14 +198,52 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     }
   };
 
-  const handleToggleDisabled = async (product: Product, currentDisabled: boolean) => {
-    await onUpdateProduct(product.id, { isDelete: !currentDisabled });
-    await loadProducts(true); // Force refresh on toggle
+  const handleToggleDisabled = async (product: Product, currentIsDelete: boolean) => {
+    const newIsDelete = !currentIsDelete;
+    // Optimistic UI update for Web Status (disabled/isDelete)
+    setPaginatedData(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === product.id ? { ...item, isDelete: newIsDelete, disabled: newIsDelete } : item
+      ),
+    }));
+
+    try {
+      await onUpdateProduct(product.id, { isDelete: newIsDelete });
+    } catch (err) {
+      console.error('Failed to update product web status:', err);
+      // Revert on error
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item.id === product.id ? { ...item, isDelete: currentIsDelete, disabled: currentIsDelete } : item
+        ),
+      }));
+    }
   };
 
   const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
-    await onUpdateProduct(product.id, { isDenuvo: !currentDenuvo });
-    await loadProducts(true); // Force refresh on toggle
+    const newDenuvo = !currentDenuvo;
+    // Optimistic UI update for Denuvo DRM status
+    setPaginatedData(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === product.id ? { ...item, isDenuvo: newDenuvo } : item
+      ),
+    }));
+
+    try {
+      await onUpdateProduct(product.id, { isDenuvo: newDenuvo });
+    } catch (err) {
+      console.error('Failed to update Denuvo status:', err);
+      // Revert on error
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item.id === product.id ? { ...item, isDenuvo: currentDenuvo } : item
+        ),
+      }));
+    }
   };
 
   const handleSelectCategory = async (product: Product, categoryName: string) => {

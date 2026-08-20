@@ -21,10 +21,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkAuth = useCallback(() => {
     const currentAuth = authService.getCurrentAuth();
     if (currentAuth && currentAuth.user) {
-      setUser(currentAuth.user);
-    } else {
-      setUser(null);
+      const role = currentAuth.user.role?.toUpperCase();
+      if (role === 'ADMIN' || role === 'MOD') {
+        setUser(currentAuth.user);
+        setLoading(false);
+        return;
+      }
     }
+    authService.logout();
+    setUser(null);
     setLoading(false);
   }, []);
 
@@ -45,6 +50,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: LoginCredentials) => {
     const response = await authService.login(credentials);
+    const role = response.user?.role?.toUpperCase();
+    if (!role || (role !== 'ADMIN' && role !== 'MOD')) {
+      authService.logout();
+      setUser(null);
+      throw new Error('Access forbidden: Only ADMIN and MOD roles can access this platform.');
+    }
+
     setUser(response.user);
     
     // Toast requirement: "Welcome back! {{username}}"

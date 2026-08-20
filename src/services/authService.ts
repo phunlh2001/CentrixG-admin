@@ -16,6 +16,12 @@ export const authService = {
     const loginData: LoginData = ('data' in resBody && resBody.data && (resBody.data as any).accessToken)
       ? (resBody.data as LoginData)
       : (resBody as LoginData);
+
+    // Enforce role requirement: Only ADMIN and MOD roles are authorized
+    const role = loginData?.user?.role?.toUpperCase();
+    if (!role || (role !== 'ADMIN' && role !== 'MOD')) {
+      throw new Error('Access forbidden: Only ADMIN and MOD roles can access this platform.');
+    }
     
     if (loginData && loginData.accessToken) {
       this.saveAuthSession(loginData);
@@ -40,11 +46,18 @@ export const authService = {
   },
 
   getCurrentAuth(): AuthTokenData | null {
-    return getStoredAuthToken();
+    const authData = getStoredAuthToken();
+    if (!authData || !authData.user) return null;
+    const role = authData.user.role?.toUpperCase();
+    if (role !== 'ADMIN' && role !== 'MOD') {
+      this.logout();
+      return null;
+    }
+    return authData;
   },
 
   getCurrentUser(): AuthUser | null {
-    const authData = getStoredAuthToken();
+    const authData = this.getCurrentAuth();
     return authData ? authData.user : null;
   },
 
