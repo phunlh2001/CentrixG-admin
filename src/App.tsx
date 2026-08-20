@@ -18,7 +18,8 @@ import overviewApi from './api/overviewApi';
 import categoryApi from './api/categoryApi';
 
 function AdminDashboard() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const isMod = user?.role?.toUpperCase() === 'MOD' || user?.role?.toUpperCase() === 'MODERATOR';
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly'>('monthly');
 
@@ -30,26 +31,25 @@ function AdminDashboard() {
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
+  // Automatically switch active tab away from overview for MOD role users
+  useEffect(() => {
+    if (isMod && (activeTab === 'overview' || activeTab === 'bills')) {
+      setActiveTab('products');
+    }
+  }, [isMod, activeTab]);
+
   const loadData = async () => {
     if (!isAuthenticated) return;
     setDataLoading(true);
     try {
-      const m = await overviewApi.getOverviewMetrics(timeframe);
+      let m: OverviewMetrics | null = null;
+      if (!isMod) {
+        m = await overviewApi.getOverviewMetrics(timeframe);
+      }
       const catList = await categoryApi.getCategories();
-      // const [m, catList, bRes, u, blog] = await Promise.all([
-      //   adminApi.getOverviewMetrics(timeframe),
-      //   adminApi.getCategories(),
-      //   adminApi.getBills(),
-      //   adminApi.getUsers(),
-      //   adminApi.getBlogPosts(),
-      // ]);
 
-      setMetrics(m);
+      if (m) setMetrics(m);
       setCategories(catList);
-      // setBills(bRes.bills);
-      // setTopPayer(bRes.topPayerOfMonth);
-      // setUsers(u);
-      // setBlogPosts(blog);
     } catch (err) {
       console.error('Failed loading admin data:', err);
     } finally {
@@ -61,7 +61,7 @@ function AdminDashboard() {
     if (isAuthenticated) {
       loadData();
     }
-  }, [timeframe, isAuthenticated]);
+  }, [timeframe, isAuthenticated, isMod]);
 
   if (authLoading) {
     return (
@@ -159,7 +159,7 @@ function AdminDashboard() {
             </div>
           ) : (
             <>
-              {activeTab === 'overview' && metrics && <OverviewPage metrics={metrics} />}
+              {activeTab === 'overview' && !isMod && metrics && <OverviewPage metrics={metrics} />}
               
               {/* Keep ProductsPage mounted to prevent re-fetching on tab navigation */}
               <div className={activeTab === 'products' ? 'block' : 'hidden'}>

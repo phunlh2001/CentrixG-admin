@@ -1,6 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Package, Warehouse, FolderKanban, FileText, Users, Newspaper, Gamepad2 } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, FolderKanban, FileText, Users, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 export type TabType = 'overview' | 'products' | 'warehouse' | 'categories' | 'bills' | 'accounts';
 
@@ -10,6 +11,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+  const { user } = useAuth();
+  const isMod = user?.role?.toUpperCase() === 'MOD';
+
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'products', label: 'Products', icon: Package },
@@ -17,8 +21,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'categories', label: 'Categories', icon: FolderKanban },
     { id: 'bills', label: 'Bills Management', icon: FileText },
     { id: 'accounts', label: 'Accounts', icon: Users },
-    // { id: 'blog', label: 'Blog & News', icon: Newspaper },
   ];
+
+  const visibleNavItems = navItems.filter(item => isMod ? !['overview', 'bills'].includes(item.id) : true);
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white flex flex-col justify-between h-screen sticky top-0">
@@ -39,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           <div className="px-3 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
             Management Core
           </div>
-          {navItems.map(item => {
+          {visibleNavItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
