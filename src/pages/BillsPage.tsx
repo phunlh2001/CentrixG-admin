@@ -234,7 +234,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
                       Highest Transactions
                     </Badge>
                   </div>
-                  <h3 className="text-xl font-bold tracking-tight text-white mt-0.5">{topPayer.user.name}</h3>
+                  <h3 className="text-xl font-bold tracking-tight text-white mt-0.5">{topPayer.user.username || topPayer.user.name || 'Top Customer'}</h3>
                   <p className="text-xs text-slate-300">{topPayer.user.email}</p>
                 </div>
               </div>
@@ -285,11 +285,11 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">Bill ID</TableHead>
-            <TableHead>Product Info</TableHead>
+            <TableHead>Product</TableHead>
             <TableHead>User Account</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Referrer Info</TableHead>
-            <TableHead>Payment Amount (VND / USD / CNY)</TableHead>
+            <TableHead>Amount</TableHead>
             <TableHead className="text-right">Date & Time</TableHead>
           </TableRow>
         </TableHeader>

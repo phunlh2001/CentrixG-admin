@@ -181,13 +181,7 @@ function AdminDashboard() {
                 />
               )}
               {activeTab === 'bills' && <BillsPage topPayer={topPayer} />}
-              {activeTab === 'accounts' && (
-                <AccountsPage
-                  users={users}
-                  onBanUser={handleBanUser}
-                  onUnbanUser={handleUnbanUser}
-                />
-              )}
+              {activeTab === 'accounts' && <AccountsPage />}
               {/* {activeTab === 'blog' && (
                 <BlogPage
                   posts={blogPosts}
