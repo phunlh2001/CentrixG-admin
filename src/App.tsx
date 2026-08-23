@@ -180,7 +180,7 @@ function AdminDashboard() {
                   onUpdateCategory={handleUpdateCategory}
                 />
               )}
-              {activeTab === 'bills' && <BillsPage bills={bills} topPayer={topPayer} />}
+              {activeTab === 'bills' && <BillsPage topPayer={topPayer} />}
               {activeTab === 'accounts' && (
                 <AccountsPage
                   users={users}

@@ -1,15 +1,41 @@
+export interface BillProductInfo {
+  id: string;
+  appId?: number;
+  name: string;
+  imageUrl: string;
+}
+
+export interface BillUserAccount {
+  id: string;
+  username: string;
+  email: string;
+}
+
+export interface BillReferrerInfo {
+  id: string;
+  username: string;
+  email: string;
+  code?: string;
+}
+
+export interface BillPaymentAmount {
+  vnd: number;
+  usd: number;
+  cny: number;
+}
+
 export interface Bill {
   id: string;
-  productId: string;
-  productName: string;
-  productImage: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  referrerInfo?: string;
-  paymentMethod: 'Credit Card' | 'PayPal' | 'Crypto' | 'Momo' | 'Bank Transfer';
-  amountVnd: number;
-  amountUsd: number;
-  amountCny: number;
+  productInfo: BillProductInfo;
+  userAccount: BillUserAccount;
+  referrerInfo?: BillReferrerInfo | null;
+  paymentAmount: BillPaymentAmount;
   createdAt: string;
+}
+
+export interface BillQueryParams {
+  search?: string;
+  paymentMethod?: string;
+  page?: number;
+  pageSize?: number;
 }

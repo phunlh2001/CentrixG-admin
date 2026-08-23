@@ -1,31 +1,169 @@
-import React, { useState } from 'react';
-import type { Bill, UserAccount } from '@/types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import type { Bill, UserAccount, PaginatedResponse } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Crown, Search, CreditCard } from 'lucide-react';
+import { Crown, Search, CreditCard, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import billApi from '@/api/billApi';
 
 interface BillsPageProps {
-  bills: Bill[];
-  topPayer: { user: UserAccount; paymentCount: number; totalSpentVnd: number } | null;
+  bills?: Bill[];
+  topPayer?: { user: UserAccount; paymentCount: number; totalSpentVnd: number } | null;
 }
 
-export const BillsPage: React.FC<BillsPageProps> = ({ bills, topPayer }) => {
+export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const isInitialMount = useRef(true);
 
-  const filteredBills = bills.filter(b => {
-    const matchesSearch =
-      b.productName.toLowerCase().includes(search.toLowerCase()) ||
-      b.userName.toLowerCase().includes(search.toLowerCase()) ||
-      b.userEmail.toLowerCase().includes(search.toLowerCase()) ||
-      (b.referrerInfo && b.referrerInfo.toLowerCase().includes(search.toLowerCase()));
-
-    const matchesMethod = paymentFilter === 'ALL' || b.paymentMethod === paymentFilter;
-    return matchesSearch && matchesMethod;
+  const [paginatedData, setPaginatedData] = useState<PaginatedResponse<Bill>>({
+    items: [],
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
   });
+  const [loading, setLoading] = useState(false);
+
+  // Debounce search input
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const loadBills = async (forceRefresh = false) => {
+    if (paginatedData.items.length === 0 || forceRefresh) {
+      setLoading(true);
+    }
+    try {
+      const data = await billApi.getBills({
+        search: debouncedSearch,
+        paymentMethod: paymentFilter,
+        page,
+        pageSize,
+      });
+      setPaginatedData(data);
+    } catch (err) {
+      console.error('Failed fetching bills:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBills();
+  }, [debouncedSearch, paymentFilter, page]);
+
+  // Memoized Table Rows
+  const tableRows = useMemo(() => {
+    if (loading && paginatedData.items.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+              Loading financial bills...
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (paginatedData.items.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-4">
+              <AlertCircle className="w-5 h-5 text-slate-300" />
+              <span>No transaction bills found</span>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return paginatedData.items.map(bill => (
+      <TableRow key={bill.id}>
+        {/* 1. Bill ID */}
+        <TableCell className="font-mono text-xs text-slate-600">
+          <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 inline-block font-semibold">
+            #{bill.id.length > 8 ? bill.id.slice(0, 8) : bill.id}
+          </span>
+        </TableCell>
+
+        {/* 2. Product Info (Single Object) */}
+        <TableCell>
+          {bill.productInfo ? (
+            <div className="flex items-center gap-2.5">
+              <img
+                src={bill.productInfo.imageUrl}
+                alt={bill.productInfo.name}
+                className="w-8 h-8 rounded object-cover border border-slate-200 shrink-0"
+              />
+              <div>
+                <div className="font-semibold text-slate-900 text-xs">{bill.productInfo.name}</div>
+                {bill.productInfo.appId && (
+                  <span className="text-[10px] font-mono text-slate-400">#{bill.productInfo.appId}</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400 font-mono">—</span>
+          )}
+        </TableCell>
+
+        {/* 3. User Account */}
+        <TableCell>
+          <div className="text-slate-900 font-semibold text-xs">{bill.userAccount?.username || '—'}</div>
+          <div className="text-[11px] text-slate-400 font-mono">{bill.userAccount?.email || '—'}</div>
+        </TableCell>
+
+        {/* 4. Referrer Info */}
+        <TableCell>
+          {bill.referrerInfo ? (
+            <div className="space-y-0.5">
+              <Badge variant="outline" className="bg-amber-50/80 text-amber-800 border-amber-200 text-[10px] font-mono">
+                {bill.referrerInfo.code || bill.referrerInfo.username}
+              </Badge>
+              <div className="text-[10px] text-slate-400 font-mono">{bill.referrerInfo.email}</div>
+            </div>
+          ) : (
+            <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-[10px] font-mono">
+              DIRECT
+            </Badge>
+          )}
+        </TableCell>
+
+        {/* 5. Payment Amount */}
+        <TableCell>
+          <div className="text-xs font-extrabold text-slate-900">
+            {formatVND(bill.paymentAmount?.vnd ?? 0)}
+          </div>
+          <div className="text-[11px] text-slate-500">
+            {formatUSD(bill.paymentAmount?.usd ?? 0)} • {formatCNY(bill.paymentAmount?.cny ?? 0)}
+          </div>
+        </TableCell>
+
+        {/* 7. Date & Time */}
+        <TableCell className="text-right text-xs text-slate-500 font-mono">
+          {bill.createdAt ? new Date(bill.createdAt).toLocaleString() : '—'}
+        </TableCell>
+      </TableRow>
+    ));
+  }, [loading, paginatedData.items]);
 
   return (
     <div className="space-y-6">
@@ -69,30 +207,27 @@ export const BillsPage: React.FC<BillsPageProps> = ({ bills, topPayer }) => {
 
       {/* Filter and Search Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-          <Input
-            placeholder="Search bills by user, product, or referrer..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-white"
-          />
-        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Input
+              placeholder="Search bills by user, product, or referrer..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Payment Method:</span>
-          <select
-            value={paymentFilter}
-            onChange={e => setPaymentFilter(e.target.value)}
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadBills(true)}
+            disabled={loading}
+            className="h-9 px-3 shrink-0"
+            title="Refresh Bills"
           >
-            <option value="ALL">All Methods</option>
-            <option value="Credit Card">Credit Card</option>
-            <option value="Momo">Momo</option>
-            <option value="PayPal">PayPal</option>
-            <option value="Crypto">Crypto</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-          </select>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
 
@@ -100,64 +235,56 @@ export const BillsPage: React.FC<BillsPageProps> = ({ bills, topPayer }) => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Bill ID</TableHead>
+            <TableHead className="w-28">Bill ID</TableHead>
             <TableHead>Product Info</TableHead>
             <TableHead>User Account</TableHead>
             <TableHead>Referrer Info</TableHead>
-            <TableHead>Payment Method</TableHead>
             <TableHead>Payment Amount (VND / USD / CNY)</TableHead>
             <TableHead className="text-right">Date & Time</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredBills.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
-                No transaction bills available
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredBills.map(bill => (
-            <TableRow key={bill.id}>
-              <TableCell className="font-mono text-xs text-slate-500">{bill.id}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2.5">
-                  <img
-                    src={bill.productImage}
-                    alt={bill.productName}
-                    className="w-9 h-9 rounded object-cover border border-slate-200"
-                  />
-                  <div className="font-semibold text-slate-900 text-xs">{bill.productName}</div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-slate-900 font-medium text-xs">{bill.userName}</div>
-                <div className="text-[11px] text-slate-400">{bill.userEmail}</div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="bg-slate-50 text-slate-600 text-[10px] font-mono">
-                  {bill.referrerInfo || 'DIRECT'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1.5 text-xs text-slate-700">
-                  <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                  {bill.paymentMethod}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-xs font-bold text-slate-900">{formatVND(bill.amountVnd)}</div>
-                <div className="text-[11px] text-slate-400">
-                  {formatUSD(bill.amountUsd)} • {formatCNY(bill.amountCny)}
-                </div>
-              </TableCell>
-              <TableCell className="text-right text-xs text-slate-500 font-mono">
-                {new Date(bill.createdAt).toLocaleString()}
-              </TableCell>
-            </TableRow>
-          )))}
+          {tableRows}
         </TableBody>
       </Table>
+
+      {/* Pagination Footer Controls */}
+      <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
+        <div className="text-slate-500 font-medium">
+          Showing <span className="font-bold text-slate-900">{paginatedData.items.length}</span> of{' '}
+          <span className="font-bold text-slate-900">{paginatedData.total}</span> bills (Page {paginatedData.page} of {paginatedData.totalPages})
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage(p => Math.max(p - 1, 1))}
+            className="h-8 gap-1"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Previous
+          </Button>
+
+          <div className="px-2 font-semibold text-slate-700">
+            {page} / {paginatedData.totalPages || 1}
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page >= paginatedData.totalPages || loading}
+            onClick={() => setPage(p => p + 1)}
+            className="h-8 gap-1"
+          >
+            Next
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
-};
+});
+
+BillsPage.displayName = 'BillsPage';
