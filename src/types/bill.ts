@@ -28,6 +28,7 @@ export interface Bill {
   id: string;
   productInfo: BillProductInfo;
   userAccount: BillUserAccount;
+  orderStatus: string;
   referrerInfo?: BillReferrerInfo | null;
   paymentAmount: BillPaymentAmount;
   createdAt: string;

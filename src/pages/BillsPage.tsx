@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Crown, Search, CreditCard, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Crown, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import billApi from '@/api/billApi';
 
 interface BillsPageProps {
@@ -14,10 +14,55 @@ interface BillsPageProps {
   topPayer?: { user: UserAccount; paymentCount: number; totalSpentVnd: number } | null;
 }
 
+const getStatusBadge = (status?: string) => {
+  const normalized = status?.toUpperCase() || 'PENDING';
+
+  switch (normalized) {
+    case 'PAID':
+    case 'SUCCESS':
+    case 'COMPLETED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          {normalized}
+        </span>
+      );
+    case 'PENDING':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          {normalized}
+        </span>
+      );
+    case 'FAILED':
+    case 'CANCELLED':
+    case 'EXPIRED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          {normalized}
+        </span>
+      );
+    case 'REFUNDED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+          {normalized}
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          {normalized}
+        </span>
+      );
+  }
+};
+
 export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const isInitialMount = useRef(true);
@@ -51,7 +96,6 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     try {
       const data = await billApi.getBills({
         search: debouncedSearch,
-        paymentMethod: paymentFilter,
         page,
         pageSize,
       });
@@ -65,7 +109,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
 
   useEffect(() => {
     loadBills();
-  }, [debouncedSearch, paymentFilter, page]);
+  }, [debouncedSearch, page]);
 
   // Memoized Table Rows
   const tableRows = useMemo(() => {
@@ -131,7 +175,12 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
           <div className="text-[11px] text-slate-400 font-mono">{bill.userAccount?.email || '—'}</div>
         </TableCell>
 
-        {/* 4. Referrer Info */}
+        {/* 4. Status Chip Tag */}
+        <TableCell>
+          {getStatusBadge(bill.orderStatus)}
+        </TableCell>
+
+        {/* 5. Referrer Info */}
         <TableCell>
           {bill.referrerInfo ? (
             <div className="space-y-0.5">
@@ -147,7 +196,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
           )}
         </TableCell>
 
-        {/* 5. Payment Amount */}
+        {/* 6. Payment Amount */}
         <TableCell>
           <div className="text-xs font-extrabold text-slate-900">
             {formatVND(bill.paymentAmount?.vnd ?? 0)}
@@ -238,6 +287,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
             <TableHead className="w-28">Bill ID</TableHead>
             <TableHead>Product Info</TableHead>
             <TableHead>User Account</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Referrer Info</TableHead>
             <TableHead>Payment Amount (VND / USD / CNY)</TableHead>
             <TableHead className="text-right">Date & Time</TableHead>
