@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { BlogPost, DynamicFormFieldSchema } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface BlogPageProps {
@@ -49,7 +49,7 @@ const BLOG_FORM_SCHEMA: DynamicFormFieldSchema[] = [
   },
 ];
 
-export const BlogPage: React.FC<BlogPageProps> = ({
+export const BlogPage: React.FC<BlogPageProps> = React.memo(({
   posts,
   onCreatePost,
   onUpdatePost,
@@ -60,13 +60,15 @@ export const BlogPage: React.FC<BlogPageProps> = ({
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredPosts = posts.filter(p =>
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.author.toLowerCase().includes(search.toLowerCase()) ||
-    p.content.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPosts = useMemo(() => {
+    return posts.filter(p =>
+      (p.title && p.title.toLowerCase().includes(search.toLowerCase())) ||
+      (p.author && p.author.toLowerCase().includes(search.toLowerCase())) ||
+      (p.content && p.content.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [posts, search]);
 
-  const handleCreateSubmit = async (values: Record<string, any>) => {
+  const handleCreateSubmit = useCallback(async (values: Record<string, any>) => {
     setIsSubmitting(true);
     try {
       const slug = values.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -81,9 +83,9 @@ export const BlogPage: React.FC<BlogPageProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [onCreatePost]);
 
-  const handleEditSubmit = async (values: Record<string, any>) => {
+  const handleEditSubmit = useCallback(async (values: Record<string, any>) => {
     if (!editingPost) return;
     setIsSubmitting(true);
     try {
@@ -99,13 +101,71 @@ export const BlogPage: React.FC<BlogPageProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingPost, onUpdatePost]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Are you sure you want to delete this news article?')) {
       await onDeletePost(id);
     }
-  };
+  }, [onDeletePost]);
+
+  // Memoized Table Rows
+  const tableRows = useMemo(() => {
+    if (filteredPosts.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-4">
+              <AlertCircle className="w-5 h-5 text-slate-300" />
+              <span>No news articles available</span>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return filteredPosts.map(post => (
+      <TableRow key={post.id}>
+        <TableCell className="font-medium max-w-xs">
+          <div className="text-slate-900 font-semibold text-sm line-clamp-1">{post.title}</div>
+          <div className="text-xs text-slate-400 font-mono">/{post.slug}</div>
+        </TableCell>
+        <TableCell className="text-xs text-slate-600 font-medium">
+          {post.author}
+        </TableCell>
+        <TableCell>
+          <Badge variant={post.status === 'published' ? 'active' : 'secondary'}>
+            {post.status}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-xs text-slate-500 font-mono">
+          {new Date(post.updatedAt).toLocaleDateString()}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingPost(post)}
+              className="h-8 gap-1"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleDelete(post.id)}
+              className="h-8 gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+  }, [filteredPosts, handleDelete]);
 
   return (
     <div className="space-y-6">
@@ -138,54 +198,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredPosts.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
-                No news articles available
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredPosts.map(post => (
-            <TableRow key={post.id}>
-              <TableCell className="font-medium max-w-xs">
-                <div className="text-slate-900 font-semibold text-sm line-clamp-1">{post.title}</div>
-                <div className="text-xs text-slate-400 font-mono">/{post.slug}</div>
-              </TableCell>
-              <TableCell className="text-xs text-slate-600 font-medium">
-                {post.author}
-              </TableCell>
-              <TableCell>
-                <Badge variant={post.status === 'published' ? 'active' : 'secondary'}>
-                  {post.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-xs text-slate-500 font-mono">
-                {new Date(post.updatedAt).toLocaleDateString()}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingPost(post)}
-                    className="h-8 gap-1"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(post.id)}
-                    className="h-8 gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          )))}
+          {tableRows}
         </TableBody>
       </Table>
 
@@ -236,4 +249,6 @@ export const BlogPage: React.FC<BlogPageProps> = ({
       </Dialog>
     </div>
   );
-};
+});
+
+BlogPage.displayName = 'BlogPage';

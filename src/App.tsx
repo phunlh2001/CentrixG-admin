@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sidebar, type TabType } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { OverviewPage } from '@/pages/OverviewPage';
@@ -7,15 +7,23 @@ import { WarehousePage } from '@/pages/WarehousePage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { BillsPage } from '@/pages/BillsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
-import { BlogPage } from '@/pages/BlogPage';
 import { LoginPage } from '@/pages/LoginPage';
-import type { Product, Bill, UserAccount, BlogPost, Category, OverviewMetrics } from '@/types';
+import type { Product, UserAccount, Category, OverviewMetrics } from '@/types';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import productApi from './api/productApi';
 import overviewApi from './api/overviewApi';
 import categoryApi from './api/categoryApi';
+
+const TAB_TITLES: Record<TabType, string> = {
+  overview: 'Platform Analytics Overview',
+  products: 'Product & Game Catalog Management',
+  warehouse: 'Unmanifested Warehouse Catalog',
+  categories: 'Game Category Administration',
+  bills: 'Financial Bills & Transactions',
+  accounts: 'User & Staff Account Administration',
+};
 
 function AdminDashboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -25,10 +33,7 @@ function AdminDashboard() {
 
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [bills, setBills] = useState<Bill[]>([]);
   const [topPayer, setTopPayer] = useState<{ user: UserAccount; paymentCount: number; totalSpentVnd: number } | null>(null);
-  const [users, setUsers] = useState<UserAccount[]>([]);
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   // Automatically switch active tab away from overview for MOD role users
@@ -38,7 +43,7 @@ function AdminDashboard() {
     }
   }, [isMod, activeTab]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     setDataLoading(true);
     try {
@@ -55,13 +60,41 @@ function AdminDashboard() {
     } finally {
       setDataLoading(false);
     }
-  };
+  }, [isAuthenticated, isMod, timeframe]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
     }
-  }, [timeframe, isAuthenticated, isMod]);
+  }, [isAuthenticated, loadData]);
+
+  // Product CRUD handlers
+  const handleCreateProduct = useCallback(async (data: Omit<Product, 'id' | 'createdAt'>) => {
+    // Placeholder for future creation API
+  }, []);
+
+  const handleUpdateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
+    await productApi.update(id, updates);
+  }, []);
+
+  // Category CRUD handlers
+  const handleCreateCategory = useCallback(async (data: Omit<Category, 'id' | 'createdAt' | 'productCount'>) => {
+    await loadData();
+  }, [loadData]);
+
+  const handleUpdateCategory = useCallback(async (id: string, updates: Partial<Category>) => {
+    await loadData();
+  }, [loadData]);
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+  }, []);
+
+  const handleTimeframeChange = useCallback((tf: 'weekly' | 'monthly') => {
+    setTimeframe(tf);
+  }, []);
+
+  const activeTabTitle = useMemo(() => TAB_TITLES[activeTab] || 'Management Console', [activeTab]);
 
   if (authLoading) {
     return (
@@ -79,74 +112,17 @@ function AdminDashboard() {
     return <LoginPage />;
   }
 
-  // Product CRUD handlers
-  const handleCreateProduct = async (data: Omit<Product, 'id' | 'createdAt' | 'totalPaidUsersCount'>) => {
-    // await adminApi.createProduct(data);
-  };
-
-  const handleUpdateProduct = async (id: string, updates: Partial<Product>) => {
-    await productApi.update(id, updates);
-  };
-
-  // Category CRUD handlers
-  const handleCreateCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'productCount'>) => {
-    // await adminApi.createCategory(data);
-    await loadData();
-  };
-
-  const handleUpdateCategory = async (id: string, updates: Partial<Category>) => {
-    // await adminApi.updateCategory(id, updates);
-    await loadData();
-  };
-
-  // User Banning handlers
-  const handleBanUser = async (userId: string, reason?: string) => {
-    // await adminApi.banUser(userId, reason);
-    await loadData();
-  };
-
-  const handleUnbanUser = async (userId: string) => {
-    // await adminApi.unbanUser(userId);
-    await loadData();
-  };
-
-  // Blog handlers
-  const handleCreateBlogPost = async (post: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) => {
-    // await adminApi.createBlogPost(post);
-    await loadData();
-  };
-
-  const handleUpdateBlogPost = async (id: string, updates: Partial<BlogPost>) => {
-    // await adminApi.updateBlogPost(id, updates);
-    await loadData();
-  };
-
-  const handleDeleteBlogPost = async (id: string) => {
-    // await adminApi.deleteBlogPost(id);
-    await loadData();
-  };
-
-  const tabTitles: Record<TabType, string> = {
-    overview: 'Platform Analytics Overview',
-    products: 'Product & Game Catalog Management',
-    warehouse: 'Unmanifested Warehouse Catalog',
-    categories: 'Game Category Administration',
-    bills: 'Financial Bills & Transactions',
-    accounts: 'User & Staff Account Administration',
-    // blog: 'Blog & Site Announcements',
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans antialiased">
       {/* Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <Header
           timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
-          activeTabTitle={tabTitles[activeTab]}
+          onTimeframeChange={handleTimeframeChange}
+          activeTabTitle={activeTabTitle}
         />
 
         <main className="p-8 flex-1 max-w-7xl w-full mx-auto">
@@ -182,14 +158,6 @@ function AdminDashboard() {
               )}
               {activeTab === 'bills' && <BillsPage topPayer={topPayer} />}
               {activeTab === 'accounts' && <AccountsPage />}
-              {/* {activeTab === 'blog' && (
-                <BlogPage
-                  posts={blogPosts}
-                  onCreatePost={handleCreateBlogPost}
-                  onUpdatePost={handleUpdateBlogPost}
-                  onDeletePost={handleDeleteBlogPost}
-                />
-              )} */}
             </>
           )}
         </main>

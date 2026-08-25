@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LayoutDashboard, Package, Warehouse, FolderKanban, FileText, Users, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -10,20 +10,22 @@ interface SidebarProps {
   onTabChange: (tab: TabType) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+const NAV_ITEMS = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'products', label: 'Products', icon: Package },
+  { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
+  { id: 'categories', label: 'Categories', icon: FolderKanban },
+  { id: 'bills', label: 'Bills Management', icon: FileText },
+  { id: 'accounts', label: 'Accounts', icon: Users },
+];
+
+export const Sidebar: React.FC<SidebarProps> = React.memo(({ activeTab, onTabChange }) => {
   const { user } = useAuth();
   const isMod = user?.role?.toUpperCase() === 'MOD';
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
-    { id: 'categories', label: 'Categories', icon: FolderKanban },
-    { id: 'bills', label: 'Bills Management', icon: FileText },
-    { id: 'accounts', label: 'Accounts', icon: Users },
-  ];
-
-  const visibleNavItems = navItems.filter(item => isMod ? !['overview', 'bills'].includes(item.id) : true);
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter(item => isMod ? !['overview', 'bills'].includes(item.id) : true);
+  }, [isMod]);
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white flex flex-col justify-between h-screen sticky top-0">
@@ -80,4 +82,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       </div>
     </aside>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';

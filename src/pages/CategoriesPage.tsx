@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Category, DynamicFormFieldSchema } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { Input } from '@/components/ui/input';
-import { Plus, Edit2, Search, FolderKanban, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Search, FolderKanban, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import categoryApi from '@/api/categoryApi';
 
 interface CategoriesPageProps {
@@ -30,7 +30,7 @@ const CATEGORY_FORM_SCHEMA: DynamicFormFieldSchema[] = [
   },
 ];
 
-export const CategoriesPage: React.FC<CategoriesPageProps> = ({
+export const CategoriesPage: React.FC<CategoriesPageProps> = React.memo(({
   categories: initialCategories,
   onCreateCategory,
   onUpdateCategory,
@@ -42,7 +42,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
       const data = await categoryApi.getCategories();
@@ -52,18 +52,20 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCategories();
-  }, [initialCategories]);
+  }, [initialCategories, fetchCategories]);
 
-  const filteredCategories = categories.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredCategories = useMemo(() => {
+    return categories.filter(c =>
+      (c.name && c.name.toLowerCase().includes(search.toLowerCase())) ||
+      (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [categories, search]);
 
-  const handleCreateSubmit = async (values: Record<string, any>) => {
+  const handleCreateSubmit = useCallback(async (values: Record<string, any>) => {
     setIsSubmitting(true);
     try {
       await onCreateCategory({
@@ -75,9 +77,9 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [onCreateCategory, fetchCategories]);
 
-  const handleEditSubmit = async (values: Record<string, any>) => {
+  const handleEditSubmit = useCallback(async (values: Record<string, any>) => {
     if (!editingCategory) return;
     setIsSubmitting(true);
     try {
@@ -90,7 +92,73 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingCategory, onUpdateCategory, fetchCategories]);
+
+  // Memoized Table Rows
+  const tableRows = useMemo(() => {
+    if (loading && categories.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+              Loading categories...
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (filteredCategories.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-4">
+              <AlertCircle className="w-5 h-5 text-slate-300" />
+              <span>No categories found</span>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return filteredCategories.map(cat => (
+      <TableRow key={cat.id}>
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200 shrink-0">
+              <FolderKanban className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-slate-900 font-semibold text-sm">{cat.name}</div>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="text-xs text-slate-600 max-w-sm truncate">
+          {cat.description || '—'}
+        </TableCell>
+        <TableCell className="text-xs font-semibold text-slate-800">
+          {cat.pendingCount ?? 0} games
+        </TableCell>
+        <TableCell className="text-xs font-semibold text-slate-800">
+          {cat.readyCount ?? 0} games
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingCategory(cat)}
+              className="h-8 gap-1"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+  }, [loading, filteredCategories, categories.length]);
 
   return (
     <div className="space-y-6">
@@ -136,59 +204,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading && categories.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
-                  Loading categories...
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : filteredCategories.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
-                No categories available
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredCategories.map(cat => (
-              <TableRow key={cat.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
-                      <FolderKanban className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-slate-900 font-semibold text-sm">{cat.name}</div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs text-slate-600 max-w-sm truncate">
-                  {cat.description || '—'}
-                </TableCell>
-                <TableCell className="text-xs font-semibold text-slate-800">
-                  {cat.pendingCount ?? 0} games
-                </TableCell>
-                <TableCell className="text-xs font-semibold text-slate-800">
-                  {cat.readyCount ?? 0} games
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditingCategory(cat)}
-                      className="h-8 gap-1"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      Edit
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
+          {tableRows}
         </TableBody>
       </Table>
 
@@ -237,4 +253,6 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({
       </Dialog>
     </div>
   );
-};
+});
+
+CategoriesPage.displayName = 'CategoriesPage';

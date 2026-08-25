@@ -8,7 +8,7 @@ export const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 8000,
+  timeout: 15_000,
 });
 
 // Request Interceptor: Attach bearer token if valid

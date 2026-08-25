@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Gamepad2, Lock, Mail, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 
-export const LoginPage: React.FC = () => {
+export const LoginPage: React.FC = React.memo(() => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setErrorMessage('Please fill in both email and password.');
@@ -36,7 +36,7 @@ export const LoginPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [email, password, login]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
@@ -127,4 +127,6 @@ export const LoginPage: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+LoginPage.displayName = 'LoginPage';

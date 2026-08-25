@@ -85,11 +85,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = React.memo(({ metrics }
           <div>
             <CardTitle className="flex items-center gap-2">
               <Award className="w-4 h-4 text-amber-500" />
-              Top Seller Products (Max 3)
+              Top Seller Products (Max 4)
             </CardTitle>
             <CardDescription>Ranked by total users paid for the game</CardDescription>
           </div>
-          <Badge variant="secondary">Top 3 Only</Badge>
+          <Badge variant="secondary">Top 4 Only</Badge>
         </div>
       </CardHeader>
       <CardContent className="p-0">

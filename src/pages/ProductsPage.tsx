@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -137,7 +137,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadProducts = async (forceRefresh = false) => {
+  const loadProducts = useCallback(async (forceRefresh = false) => {
     // Only show full loading UI if we have no items cached or forceRefresh requested
     if (paginatedData.items.length === 0 || forceRefresh) {
       setLoading(true);
@@ -154,13 +154,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
 
   useEffect(() => {
     loadProducts();
   }, [debouncedSearch, page]);
 
-  const handleCreateSubmit = async (values: Record<string, any>) => {
+  const handleCreateSubmit = useCallback(async (values: Record<string, any>) => {
     setIsSubmitting(true);
     try {
       await onCreateProduct({
@@ -173,13 +173,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         categories: values.categories,
       });
       setIsCreateModalOpen(false);
-      await loadProducts(true); // Force refresh on creation
+      await loadProducts(true);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [onCreateProduct, loadProducts]);
 
-  const handleEditSubmit = async (values: Record<string, any>) => {
+  const handleEditSubmit = useCallback(async (values: Record<string, any>) => {
     if (!editingProduct) return;
     setIsSubmitting(true);
     try {
@@ -192,13 +192,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         categories: values.categories,
       });
       setEditingProduct(null);
-      await loadProducts(true); // Force refresh on edit change
+      await loadProducts(true);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingProduct, onUpdateProduct, loadProducts]);
 
-  const handleToggleDisabled = async (product: Product, currentIsDelete: boolean) => {
+  const handleToggleDisabled = useCallback(async (product: Product, currentIsDelete: boolean) => {
     const newIsDelete = !currentIsDelete;
     // Optimistic UI update for Web Status (disabled/isDelete)
     setPaginatedData(prev => ({
@@ -220,9 +220,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         ),
       }));
     }
-  };
+  }, [onUpdateProduct]);
 
-  const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
+  const handleToggleDenuvo = useCallback(async (product: Product, currentDenuvo: boolean) => {
     const newDenuvo = !currentDenuvo;
     // Optimistic UI update for Denuvo DRM status
     setPaginatedData(prev => ({
@@ -244,9 +244,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         ),
       }));
     }
-  };
+  }, [onUpdateProduct]);
 
-  const handleSelectCategory = async (product: Product, categoryName: string) => {
+  const handleSelectCategory = useCallback(async (product: Product, categoryName: string) => {
     setUpdatingCategoryId(product.id);
     // Optimistic UI update: immediately change state so UI updates without lag
     setPaginatedData(prev => ({
@@ -269,7 +269,127 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     } finally {
       setUpdatingCategoryId(null);
     }
-  };
+  }, [loadProducts]);
+
+  // Memoized Table Rows
+  const tableRows = useMemo(() => {
+    if (loading && paginatedData.items.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+              Loading products...
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (paginatedData.items.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-4">
+              <AlertCircle className="w-5 h-5 text-slate-300" />
+              <span>No products found</span>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return paginatedData.items.map(product => (
+      <TableRow key={product.id} className={product.isDelete ? 'bg-slate-50/70' : ''}>
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-3">
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-10 h-10 rounded-md object-cover border border-slate-200"
+            />
+            <div>
+              <div className="text-slate-900 font-semibold text-sm">{product.name}</div>
+              {product.publisher && (
+                <div className="text-xs text-slate-400">{product.publisher}</div>
+              )}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="text-xs font-bold text-slate-900">{formatVND(Number(product.pricing.vnd))}</div>
+          <div className="text-[11px] text-slate-500">
+            {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={!product.isDelete}
+              onCheckedChange={() => handleToggleDisabled(product, product.isDelete)}
+            />
+            <Badge variant={!product.isDelete ? 'active' : 'disabled'}>
+              {!product.isDelete ? 'Displayed on Web' : 'Disabled (Hidden)'}
+            </Badge>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={product.isDenuvo}
+              onCheckedChange={() => handleToggleDenuvo(product, product.isDenuvo)}
+            />
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="relative inline-block">
+            <select
+              disabled={updatingCategoryId === product.id}
+              onChange={e => handleSelectCategory(product, e.target.value)}
+              value={product.type?.name ?? ''}
+              className={`appearance-none h-8 w-36 pl-8 pr-7 rounded-md border text-xs font-semibold cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
+                product.type?.name === 'Rockstar'
+                  ? 'bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100/80'
+                  : product.type?.name === 'Ubisoft'
+                  ? 'bg-indigo-50/80 text-indigo-800 border-indigo-200 hover:bg-indigo-100/80'
+                  : product.type?.name === 'EA'
+                  ? 'bg-rose-50/80 text-rose-800 border-rose-200 hover:bg-rose-100/80'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <option value="" className="bg-white text-slate-600">Unassigned</option>
+              {CATEGORIES.map(opt => (
+                <option key={opt.value} value={opt.value} className="bg-white text-slate-900 font-medium">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+              {updatingCategoryId === product.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" />
+              ) : (
+                <Tag className="w-3.5 h-3.5 opacity-70" />
+              )}
+            </div>
+            <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditingProduct(product)}
+            className="h-8 gap-1"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            Edit Details
+          </Button>
+        </TableCell>
+      </TableRow>
+    ));
+  }, [loading, paginatedData.items, updatingCategoryId, handleToggleDisabled, handleToggleDenuvo, handleSelectCategory]);
 
   return (
     <div className="space-y-6">
@@ -286,11 +406,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
             />
           </div>
         </div>
-
-        {/* <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 shrink-0">
-          <Plus className="w-4 h-4" />
-          Create New Product
-        </Button> */}
       </div>
 
       {/* Products Table */}
@@ -306,110 +421,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading && paginatedData.items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
-                Loading products...
-              </TableCell>
-            </TableRow>
-          ) : paginatedData.items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
-                No products found
-              </TableCell>
-            </TableRow>
-          ) : (
-            paginatedData.items.map(product => (
-              <TableRow key={product.id} className={product.isDelete ? 'bg-slate-50/70' : ''}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-10 h-10 rounded-md object-cover border border-slate-200"
-                    />
-                    <div>
-                      <div className="text-slate-900 font-semibold text-sm">{product.name}</div>
-                      {product.publisher && (
-                        <div className="text-xs text-slate-400">{product.publisher}</div>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-xs font-bold text-slate-900">{formatVND(Number(product.pricing.vnd))}</div>
-                  <div className="text-[11px] text-slate-500">
-                    {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={!product.isDelete}
-                      onCheckedChange={() => handleToggleDisabled(product, product.isDelete)}
-                    />
-                    <Badge variant={!product.isDelete ? 'active' : 'disabled'}>
-                      {!product.isDelete ? 'Displayed on Web' : 'Disabled (Hidden)'}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={product.isDenuvo}
-                      onCheckedChange={() => handleToggleDenuvo(product, product.isDenuvo)}
-                    />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="relative inline-block">
-                    <select
-                      disabled={updatingCategoryId === product.id}
-                      onChange={e => handleSelectCategory(product, e.target.value)}
-                      value={product.type?.name ?? ''}
-                      className={`appearance-none h-8 w-36 pl-8 pr-7 rounded-md border text-xs font-semibold cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
-                        product.type?.name === 'Rockstar'
-                          ? 'bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100/80'
-                          : product.type?.name === 'Ubisoft'
-                          ? 'bg-indigo-50/80 text-indigo-800 border-indigo-200 hover:bg-indigo-100/80'
-                          : product.type?.name === 'EA'
-                          ? 'bg-rose-50/80 text-rose-800 border-rose-200 hover:bg-rose-100/80'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <option value="" className="bg-white text-slate-600">Unassigned</option>
-                      {CATEGORIES.map(opt => (
-                        <option key={opt.value} value={opt.value} className="bg-white text-slate-900 font-medium">
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-                      {updatingCategoryId === product.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" />
-                      ) : (
-                        <Tag className="w-3.5 h-3.5 opacity-70" />
-                      )}
-                    </div>
-                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
-                      <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingProduct(product)}
-                    className="h-8 gap-1"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit Details
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
+          {tableRows}
         </TableBody>
       </Table>
 
@@ -472,9 +484,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
       <Dialog open={Boolean(editingProduct)} onOpenChange={(open) => !open && setEditingProduct(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Product Details: {editingProduct?.name}</DialogTitle>
+            <DialogTitle>Edit Product: {editingProduct?.name}</DialogTitle>
             <DialogDescription>
-              Modify price (VND base with live USD/CNY auto-conversion), game title, and web display visibility flag.
+              Update product pricing, availability status, or details.
             </DialogDescription>
           </DialogHeader>
           {editingProduct && (
@@ -484,12 +496,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
                 name: editingProduct.name,
                 prices: editingProduct.pricing,
                 imageUrl: editingProduct.imageUrl,
-                disabled: !editingProduct.isDelete,
-                isDenuvo: editingProduct.isDenuvo
+                disabled: editingProduct.isDelete,
+                isDenuvo: editingProduct.isDenuvo,
               }}
               onSubmit={handleEditSubmit}
               onCancel={() => setEditingProduct(null)}
-              submitText="Save Product Details"
+              submitText="Update Product"
               isSubmitting={isSubmitting}
             />
           )}

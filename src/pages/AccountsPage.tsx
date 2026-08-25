@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { UserAccount } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
   const [emailPreviewUser, setEmailPreviewUser] = useState<{ user: UserAccount; reason?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadUsers = async (forceRefresh = false) => {
+  const loadUsers = useCallback(async (forceRefresh = false) => {
     if (users.length === 0 || forceRefresh) {
       setLoading(true);
     }
@@ -39,7 +39,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  };
+  }, [users.length]);
 
   useEffect(() => {
     loadUsers();
@@ -53,7 +53,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     );
   }, [users, search]);
 
-  const handleConfirmBan = async () => {
+  const handleConfirmBan = useCallback(async () => {
     if (!banModalUser) return;
     setIsSubmitting(true);
     const reasonText = banReason.trim() || 'Violation of platform terms of service';
@@ -90,9 +90,9 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [banModalUser, banReason, externalBanUser, loadUsers]);
 
-  const handleUnban = async (user: UserAccount) => {
+  const handleUnban = useCallback(async (user: UserAccount) => {
     // Optimistic UI update
     setUsers(prev =>
       prev.map(u =>
@@ -114,7 +114,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
       console.error('Failed to unban user:', err);
       await loadUsers(true);
     }
-  };
+  }, [externalUnbanUser, loadUsers]);
 
   const tableRows = useMemo(() => {
     if (loading && users.length === 0) {
@@ -227,7 +227,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
         </TableCell>
       </TableRow>
     ));
-  }, [loading, filteredUsers, users.length]);
+  }, [loading, filteredUsers, users.length, handleUnban]);
 
   return (
     <div className="space-y-6">

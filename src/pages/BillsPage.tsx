@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Bill, UserAccount, PaginatedResponse } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
@@ -89,7 +89,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadBills = async (forceRefresh = false) => {
+  const loadBills = useCallback(async (forceRefresh = false) => {
     if (paginatedData.items.length === 0 || forceRefresh) {
       setLoading(true);
     }
@@ -105,11 +105,11 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
 
   useEffect(() => {
     loadBills();
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, loadBills]);
 
   // Memoized Table Rows
   const tableRows = useMemo(() => {
@@ -285,11 +285,11 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">Bill ID</TableHead>
-            <TableHead>Product</TableHead>
+            <TableHead>Product Info</TableHead>
             <TableHead>User Account</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Referrer Info</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Payment Amount (VND / USD / CNY)</TableHead>
             <TableHead className="text-right">Date & Time</TableHead>
           </TableRow>
         </TableHeader>

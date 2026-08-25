@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +87,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadWarehouseProducts = async (forceRefresh = false) => {
+  const loadWarehouseProducts = useCallback(async (forceRefresh = false) => {
     if (paginatedData.items.length === 0 || forceRefresh) {
       setLoading(true);
     }
@@ -104,13 +104,13 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
 
   useEffect(() => {
     loadWarehouseProducts();
   }, [debouncedSearch, page]);
 
-  const handleEditSubmit = async (values: Record<string, any>) => {
+  const handleEditSubmit = useCallback(async (values: Record<string, any>) => {
     if (!editingProduct) return;
     setIsSubmitting(true);
     try {
@@ -126,9 +126,9 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingProduct, onUpdateProduct, loadWarehouseProducts]);
 
-  const handleToggleDenuvo = async (product: Product, currentDenuvo: boolean) => {
+  const handleToggleDenuvo = useCallback(async (product: Product, currentDenuvo: boolean) => {
     const newDenuvo = !currentDenuvo;
     // Optimistic UI update for Warehouse Denuvo status
     setPaginatedData(prev => ({
@@ -150,9 +150,9 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
         ),
       }));
     }
-  };
+  }, [onUpdateProduct]);
 
-  const handleSelectCategory = async (product: Product, categoryName: string) => {
+  const handleSelectCategory = useCallback(async (product: Product, categoryName: string) => {
     setUpdatingCategoryId(product.id);
     // Optimistic UI update
     setPaginatedData(prev => ({
@@ -175,10 +175,10 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     } finally {
       setUpdatingCategoryId(null);
     }
-  };
+  }, [loadWarehouseProducts]);
 
   // Export list of App IDs to exports.txt file (123\n456\n789)
-  const handleExportAppIds = () => {
+  const handleExportAppIds = useCallback(() => {
     if (paginatedData.items.length === 0) return;
     const content = paginatedData.items
       .map(item => item.appId)
@@ -193,7 +193,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }, [paginatedData.items]);
 
   // Memoize header notice banner (re-renders only when total count changes)
   const headerBanner = useMemo(() => (
@@ -216,7 +216,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     if (loading && paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               Loading warehouse catalog...
@@ -229,7 +229,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     if (paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
             <div className="flex flex-col items-center justify-center gap-1.5 py-4">
               <AlertCircle className="w-5 h-5 text-slate-300" />
               <span>No unmanifested warehouse products found</span>
@@ -336,7 +336,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
         </TableCell>
       </TableRow>
     ));
-  }, [loading, paginatedData.items, updatingCategoryId]);
+  }, [loading, paginatedData.items, updatingCategoryId, handleSelectCategory, handleToggleDenuvo]);
 
   return (
     <div className="space-y-6">

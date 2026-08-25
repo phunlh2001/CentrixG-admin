@@ -9,7 +9,7 @@ interface HeaderProps {
   activeTabTitle: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   timeframe,
   onTimeframeChange,
   activeTabTitle,
@@ -82,4 +82,6 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
   );
-};
+});
+
+Header.displayName = 'Header';
