@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { UserAccount } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ShieldAlert, Mail, Ban, Search, ShieldCheck, Eye, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldAlert, Mail, Ban, Search, ShieldCheck, Eye, RefreshCw, Loader2, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import userApi from '@/api/userApi';
 
 interface AccountsPageProps {
@@ -14,6 +13,34 @@ interface AccountsPageProps {
   onUnbanUser?: (userId: string) => Promise<void>;
 }
 
+const getRoleBadge = (role?: string) => {
+  const normalized = role?.toUpperCase() || 'CUSTOMER';
+
+  switch (normalized) {
+    case 'CUSTOMER':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+          CUSTOMER
+        </span>
+      );
+    case 'SELLER':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+          SELLER
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          {normalized}
+        </span>
+      );
+  }
+};
+
 export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
   onBanUser: externalBanUser,
   onUnbanUser: externalUnbanUser,
@@ -21,6 +48,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<string | null>(null);
 
   const [banModalUser, setBanModalUser] = useState<UserAccount | null>(null);
   const [banReason, setBanReason] = useState('');
@@ -52,6 +80,34 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
       (u.role && u.role.toLowerCase().includes(search.toLowerCase()))
     );
   }, [users, search]);
+
+  const handleUpdateRole = useCallback(async (user: UserAccount, targetType: 'promote' | 'demote') => {
+    const previousRole = user.role;
+    const nextRole = targetType === 'promote' ? 'SELLER' : 'CUSTOMER';
+    setUpdatingRoleUserId(user.id);
+
+    // Optimistic UI update
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === user.id ? { ...u, role: nextRole } : u
+      )
+    );
+
+    try {
+      await userApi.updateUserRole(user.id, targetType);
+    } catch (err) {
+      console.error(`Failed to ${targetType} user role:`, err);
+      // Revert on error
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === user.id ? { ...u, role: previousRole } : u
+        )
+      );
+      await loadUsers(true);
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  }, [loadUsers]);
 
   const handleConfirmBan = useCallback(async () => {
     if (!banModalUser) return;
@@ -120,7 +176,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     if (loading && users.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               Loading registered user accounts...
@@ -133,7 +189,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     if (filteredUsers.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
             <div className="flex flex-col items-center justify-center gap-1.5 py-4">
               <AlertCircle className="w-5 h-5 text-slate-300" />
               <span>No user accounts found</span>
@@ -158,14 +214,51 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           </div>
         </TableCell>
 
-        {/* 2. Role */}
+        {/* 2. Role Chip Tag */}
         <TableCell>
-          <Badge variant="outline" className="capitalize text-xs font-semibold">
-            {user.role}
-          </Badge>
+          {getRoleBadge(user.role)}
         </TableCell>
 
-        {/* 3. Account Status */}
+        {/* 3. Role Action (Promote / Demote) */}
+        <TableCell>
+          {user.role?.toUpperCase() === 'CUSTOMER' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={updatingRoleUserId === user.id || user.isBlock}
+              onClick={() => handleUpdateRole(user, 'promote')}
+              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-sky-200 text-sky-700 bg-sky-50/50 hover:bg-sky-100 hover:text-sky-800 transition-colors"
+              title="Promote to Seller"
+            >
+              {updatingRoleUserId === user.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ArrowUpCircle className="w-3.5 h-3.5 text-sky-600" />
+              )}
+              Promote
+            </Button>
+          ) : user.role?.toUpperCase() === 'SELLER' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={updatingRoleUserId === user.id || user.isBlock}
+              onClick={() => handleUpdateRole(user, 'demote')}
+              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100 hover:text-purple-800 transition-colors"
+              title="Demote to Customer"
+            >
+              {updatingRoleUserId === user.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ArrowDownCircle className="w-3.5 h-3.5 text-purple-600" />
+              )}
+              Demote
+            </Button>
+          ) : (
+            <span className="text-xs text-slate-400 font-mono">—</span>
+          )}
+        </TableCell>
+
+        {/* 4. Account Status */}
         <TableCell>
           {user.isBlock ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
@@ -180,17 +273,17 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           )}
         </TableCell>
 
-        {/* 4. Ban Reason */}
+        {/* 5. Ban Reason */}
         <TableCell className="text-xs text-slate-600 max-w-xs truncate">
           {user.resonable || '—'}
         </TableCell>
 
-        {/* 5. Created At */}
+        {/* 6. Created At */}
         <TableCell className="text-xs text-slate-500 font-mono">
           {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
         </TableCell>
 
-        {/* 6. Actions */}
+        {/* 7. Actions */}
         <TableCell className="text-right">
           {!user.isBlock ? (
             <Button
@@ -227,7 +320,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
         </TableCell>
       </TableRow>
     ));
-  }, [loading, filteredUsers, users.length, handleUnban]);
+  }, [loading, filteredUsers, users.length, updatingRoleUserId, handleUpdateRole, handleUnban]);
 
   return (
     <div className="space-y-6">
@@ -268,6 +361,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           <TableRow>
             <TableHead>User Account</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Role Management</TableHead>
             <TableHead>Account Status</TableHead>
             <TableHead>Ban Reason (if any)</TableHead>
             <TableHead>Created At</TableHead>

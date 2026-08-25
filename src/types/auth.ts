@@ -1,8 +1,10 @@
 import type { BaseResponse } from './api';
 
-export type Role = 'admin' | 'staff' | 'customer' | 'moderator';
+export type Role = 'admin' | 'staff' | 'customer' | 'moderator' | 'seller';
 
 export type UserStatus = 'active' | 'banned';
+
+export type RoleUpdateType = 'promote' | 'demote';
 
 export interface UserAccount {
   id: string;
@@ -19,6 +21,10 @@ export interface BanUserDto {
   userId: string;
   reason?: string | null;
   isBlock: boolean;
+}
+
+export interface UpdateUserRoleDto {
+  userId: string;
 }
 
 export interface AuthUser {
