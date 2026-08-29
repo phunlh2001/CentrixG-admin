@@ -26,7 +26,8 @@ export interface BillPaymentAmount {
 
 export interface Bill {
   id: string;
-  productInfo: BillProductInfo;
+  products?: BillProductInfo[];
+  productInfo?: BillProductInfo[] | BillProductInfo;
   userAccount: BillUserAccount;
   orderStatus: string;
   referrerInfo?: BillReferrerInfo | null;

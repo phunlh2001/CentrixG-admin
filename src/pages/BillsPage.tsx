@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { Bill, UserAccount, PaginatedResponse } from '@/types';
+import type { Bill, UserAccount, PaginatedResponse, BillProductInfo } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Crown, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Crown, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Boxes } from 'lucide-react';
 import billApi from '@/api/billApi';
 
 interface BillsPageProps {
@@ -18,36 +18,36 @@ const getStatusBadge = (status?: string) => {
   const normalized = status?.toUpperCase() || 'PENDING';
 
   switch (normalized) {
+    case 'COMPLETED':
     case 'PAID':
     case 'SUCCESS':
-    case 'COMPLETED':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          {normalized}
+          COMPLETED
         </span>
       );
     case 'PENDING':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shadow-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          {normalized}
+          PENDING
+        </span>
+      );
+    case 'CANCELED':
+    case 'CANCELLED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-300 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+          CANCELED
         </span>
       );
     case 'FAILED':
-    case 'CANCELLED':
     case 'EXPIRED':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-          {normalized}
-        </span>
-      );
-    case 'REFUNDED':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-          {normalized}
+          FAILED
         </span>
       );
     default:
@@ -60,12 +60,26 @@ const getStatusBadge = (status?: string) => {
   }
 };
 
+const getBillProducts = (bill: Bill): BillProductInfo[] => {
+  if (Array.isArray(bill.products) && bill.products.length > 0) {
+    return bill.products;
+  }
+  if (Array.isArray(bill.productInfo) && bill.productInfo.length > 0) {
+    return bill.productInfo;
+  }
+  if (bill.productInfo && typeof bill.productInfo === 'object' && 'name' in bill.productInfo) {
+    return [bill.productInfo as BillProductInfo];
+  }
+  return [];
+};
+
 export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const isInitialMount = useRef(true);
+  const [expandedBillIds, setExpandedBillIds] = useState<Set<string>>(new Set());
 
   const [paginatedData, setPaginatedData] = useState<PaginatedResponse<Bill>>({
     items: [],
@@ -111,6 +125,18 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     loadBills();
   }, [debouncedSearch, page, loadBills]);
 
+  const toggleRowExpand = useCallback((billId: string) => {
+    setExpandedBillIds(prev => {
+      const next = new Set(prev);
+      if (next.has(billId)) {
+        next.delete(billId);
+      } else {
+        next.add(billId);
+      }
+      return next;
+    });
+  }, []);
+
   // Memoized Table Rows
   const tableRows = useMemo(() => {
     if (loading && paginatedData.items.length === 0) {
@@ -139,80 +165,174 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
       );
     }
 
-    return paginatedData.items.map(bill => (
-      <TableRow key={bill.id}>
-        {/* 1. Bill ID */}
-        <TableCell className="font-mono text-xs text-slate-600">
-          <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 inline-block font-semibold">
-            #{bill.id.length > 8 ? bill.id.slice(0, 8) : bill.id}
-          </span>
-        </TableCell>
+    return paginatedData.items.map(bill => {
+      const products = getBillProducts(bill);
+      const isExpanded = expandedBillIds.has(bill.id);
+      const firstProduct = products[0];
+      const hasMultiple = products.length > 1;
 
-        {/* 2. Product Info (Single Object) */}
-        <TableCell>
-          {bill.productInfo ? (
-            <div className="flex items-center gap-2.5">
-              <img
-                src={bill.productInfo.imageUrl}
-                alt={bill.productInfo.name}
-                className="w-8 h-8 rounded object-cover border border-slate-200 shrink-0"
-              />
-              <div>
-                <div className="font-semibold text-slate-900 text-xs">{bill.productInfo.name}</div>
-                {bill.productInfo.appId && (
-                  <span className="text-[10px] font-mono text-slate-400">#{bill.productInfo.appId}</span>
-                )}
+      return (
+        <React.Fragment key={bill.id}>
+          <TableRow className={isExpanded ? 'bg-slate-50/50 border-b-0' : ''}>
+            {/* 1. Bill ID */}
+            <TableCell className="font-mono text-xs text-slate-600">
+              <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 inline-block font-semibold">
+                #{bill.id.length > 8 ? bill.id.slice(0, 8) : bill.id}
+              </span>
+            </TableCell>
+
+            {/* 2. Product Info with Multi-product Expand Preview */}
+            <TableCell>
+              {products.length > 0 ? (
+                <div className="flex items-center gap-2.5">
+                  {firstProduct?.imageUrl ? (
+                    <img
+                      src={firstProduct.imageUrl}
+                      alt={firstProduct.name}
+                      className="w-8 h-8 rounded object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      <Boxes className="w-4 h-4 text-slate-400" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-900 text-xs truncate max-w-[160px] sm:max-w-[200px]">
+                        {firstProduct?.name || 'Product'}
+                      </span>
+                      {hasMultiple && (
+                        <button
+                          onClick={() => toggleRowExpand(bill.id)}
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer transition-colors"
+                          title="Toggle all order products"
+                        >
+                          +{products.length - 1} more
+                          {isExpanded ? (
+                            <ChevronUp className="w-3 h-3 text-slate-500" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 text-slate-500" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {firstProduct?.appId && (
+                        <span className="text-[10px] font-mono text-slate-400">#{firstProduct.appId}</span>
+                      )}
+                      {!hasMultiple && (
+                        <span className="text-[10px] text-slate-400 font-mono">1 item</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400 font-mono">—</span>
+              )}
+            </TableCell>
+
+            {/* 3. User Account */}
+            <TableCell>
+              <div className="text-slate-900 font-semibold text-xs">{bill.userAccount?.username || '—'}</div>
+              <div className="text-[11px] text-slate-400 font-mono">{bill.userAccount?.email || '—'}</div>
+            </TableCell>
+
+            {/* 4. Status Chip Tag */}
+            <TableCell>
+              {getStatusBadge(bill.orderStatus)}
+            </TableCell>
+
+            {/* 5. Referrer Info */}
+            <TableCell>
+              {bill.referrerInfo ? (
+                <div className="space-y-0.5">
+                  <Badge variant="outline" className="bg-amber-50/80 text-amber-800 border-amber-200 text-[10px] font-mono">
+                    {bill.referrerInfo.code || bill.referrerInfo.username}
+                  </Badge>
+                  <div className="text-[10px] text-slate-400 font-mono">{bill.referrerInfo.email}</div>
+                </div>
+              ) : (
+                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-[10px] font-mono">
+                  DIRECT
+                </Badge>
+              )}
+            </TableCell>
+
+            {/* 6. Payment Amount */}
+            <TableCell>
+              <div className="text-xs font-extrabold text-slate-900">
+                {formatVND(bill.paymentAmount?.vnd ?? 0)}
               </div>
-            </div>
-          ) : (
-            <span className="text-xs text-slate-400 font-mono">—</span>
+              <div className="text-[11px] text-slate-500">
+                {formatUSD(bill.paymentAmount?.usd ?? 0)} • {formatCNY(bill.paymentAmount?.cny ?? 0)}
+              </div>
+            </TableCell>
+
+            {/* 7. Date & Time */}
+            <TableCell className="text-right text-xs text-slate-500 font-mono">
+              {bill.createdAt ? new Date(bill.createdAt).toLocaleString() : '—'}
+            </TableCell>
+          </TableRow>
+
+          {/* Expanded Multi-Product Minimalist Drawer Sub-Row */}
+          {isExpanded && (
+            <TableRow className="bg-slate-50/70 border-b border-slate-200">
+              <TableCell colSpan={7} className="p-0">
+                <div className="p-4 sm:px-6 border-t border-dashed border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Boxes className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="font-semibold text-slate-800">Order Items</span>
+                      <Badge variant="outline" className="bg-white border-slate-200 text-slate-700 text-[10px] font-mono">
+                        {products.length} {products.length === 1 ? 'game' : 'games'}
+                      </Badge>
+                    </div>
+                    <button
+                      onClick={() => toggleRowExpand(bill.id)}
+                      className="text-[11px] text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
+                    >
+                      Collapse details ↑
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {products.map((prod, idx) => (
+                      <div
+                        key={prod.id || `${bill.id}-prod-${idx}`}
+                        className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 bg-white shadow-xs hover:border-slate-300 transition-all"
+                      >
+                        <img
+                          src={prod.imageUrl}
+                          alt={prod.name}
+                          className="w-10 h-10 rounded-md object-cover border border-slate-200 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-slate-900 text-xs truncate" title={prod.name}>
+                            {prod.name}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {prod.appId ? (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono font-medium text-slate-600">
+                                #{prod.appId}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-slate-400">—</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
           )}
-        </TableCell>
-
-        {/* 3. User Account */}
-        <TableCell>
-          <div className="text-slate-900 font-semibold text-xs">{bill.userAccount?.username || '—'}</div>
-          <div className="text-[11px] text-slate-400 font-mono">{bill.userAccount?.email || '—'}</div>
-        </TableCell>
-
-        {/* 4. Status Chip Tag */}
-        <TableCell>
-          {getStatusBadge(bill.orderStatus)}
-        </TableCell>
-
-        {/* 5. Referrer Info */}
-        <TableCell>
-          {bill.referrerInfo ? (
-            <div className="space-y-0.5">
-              <Badge variant="outline" className="bg-amber-50/80 text-amber-800 border-amber-200 text-[10px] font-mono">
-                {bill.referrerInfo.code || bill.referrerInfo.username}
-              </Badge>
-              <div className="text-[10px] text-slate-400 font-mono">{bill.referrerInfo.email}</div>
-            </div>
-          ) : (
-            <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-[10px] font-mono">
-              DIRECT
-            </Badge>
-          )}
-        </TableCell>
-
-        {/* 6. Payment Amount */}
-        <TableCell>
-          <div className="text-xs font-extrabold text-slate-900">
-            {formatVND(bill.paymentAmount?.vnd ?? 0)}
-          </div>
-          <div className="text-[11px] text-slate-500">
-            {formatUSD(bill.paymentAmount?.usd ?? 0)} • {formatCNY(bill.paymentAmount?.cny ?? 0)}
-          </div>
-        </TableCell>
-
-        {/* 7. Date & Time */}
-        <TableCell className="text-right text-xs text-slate-500 font-mono">
-          {bill.createdAt ? new Date(bill.createdAt).toLocaleString() : '—'}
-        </TableCell>
-      </TableRow>
-    ));
-  }, [loading, paginatedData.items]);
+        </React.Fragment>
+      );
+    });
+  }, [loading, paginatedData.items, expandedBillIds, toggleRowExpand]);
 
   return (
     <div className="space-y-6">
@@ -289,7 +409,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
             <TableHead>User Account</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Referrer Info</TableHead>
-            <TableHead>Payment Amount (VND / USD / CNY)</TableHead>
+            <TableHead>Payment Amount</TableHead>
             <TableHead className="text-right">Date & Time</TableHead>
           </TableRow>
         </TableHeader>
