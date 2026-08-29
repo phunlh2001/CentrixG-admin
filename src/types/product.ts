@@ -31,6 +31,7 @@ export interface ProductQueryParams {
   page?: number;
   pageSize?: number;
   hasManifest?: boolean;
+  newest?: boolean;
 }
 
 export interface CreateProductDto {

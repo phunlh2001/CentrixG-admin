@@ -72,6 +72,10 @@ export class ProductApi {
       queryParams.append('hasManifest', String(params.hasManifest));
     }
 
+    if (params?.newest !== undefined) {
+      queryParams.append('newest', String(params.newest));
+    }
+
     if (search) {
       queryParams.append('search', search);
     }
