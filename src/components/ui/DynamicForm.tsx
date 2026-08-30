@@ -23,9 +23,9 @@ const buildDefaults = (fieldsList: DynamicFormFieldSchema[], initVals: Record<st
     } else if (field.defaultValue !== undefined) {
       defaults[field.name] = field.defaultValue;
     } else if (field.type === 'toggle') {
-      defaults[field.name] = initVals[field.name] || field.defaultValue;
+      defaults[field.name] = initVals[field.name] ?? field.defaultValue ?? false;
     } else if (field.type === 'vnd-currency') {
-      defaults[field.name] = initVals[field.name] || { vnd: 0, usd: 0, cny: 0 };
+      defaults[field.name] = initVals[field.name] ?? { vnd: 0, usd: 0, cny: 0 };
     } else {
       defaults[field.name] = '';
     }
@@ -62,14 +62,15 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
     }));
   };
 
-  const handleVndChange = (fieldName: string, vndValue: number) => {
-    const calculatedUsd = convertVNDToUSD(vndValue, usdRate);
-    const calculatedCny = convertVNDToCNY(vndValue, cnyRate);
+  const handleVndChange = (fieldName: string, vndValue: number | string) => {
+    const numericVnd = vndValue === '' ? 0 : Number(vndValue);
+    const calculatedUsd = convertVNDToUSD(numericVnd, usdRate);
+    const calculatedCny = convertVNDToCNY(numericVnd, cnyRate);
 
     setFormData(prev => ({
       ...prev,
       [fieldName]: {
-        vnd: vndValue,
+        vnd: numericVnd,
         usd: calculatedUsd,
         cny: calculatedCny,
       },
@@ -146,6 +147,9 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
 
         if (field.type === 'vnd-currency') {
           const currentPrices = value || { vnd: 0, usd: 0, cny: 0 };
+          const rawVnd = currentPrices.vnd;
+          const displayVnd = rawVnd !== undefined && rawVnd !== null ? rawVnd : '';
+
           return (
             <div key={field.name} className="space-y-2 rounded-lg border border-slate-200 p-4 bg-slate-50/40">
               <div className="flex items-center justify-between">
@@ -172,7 +176,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
                       onChange={e => {
                         const newRate = Number(e.target.value) || 25400;
                         setUsdRate(newRate);
-                        handleVndChange(field.name, currentPrices.vnd || 0);
+                        handleVndChange(field.name, currentPrices.vnd ?? 0);
                       }}
                       className="h-7 text-xs mt-1"
                     />
@@ -185,7 +189,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
                       onChange={e => {
                         const newRate = Number(e.target.value) || 3550;
                         setCnyRate(newRate);
-                        handleVndChange(field.name, currentPrices.vnd || 0);
+                        handleVndChange(field.name, currentPrices.vnd ?? 0);
                       }}
                       className="h-7 text-xs mt-1"
                     />
@@ -198,9 +202,10 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
                 <div className="relative">
                   <Input
                     type="number"
-                    value={currentPrices.vnd || ''}
-                    onChange={e => handleVndChange(field.name, Number(e.target.value) || 0)}
-                    placeholder="e.g. 500000"
+                    min={0}
+                    value={displayVnd}
+                    onChange={e => handleVndChange(field.name, e.target.value)}
+                    placeholder="e.g. 500000 or 0"
                     required={field.required}
                     className="pl-8"
                   />
@@ -212,11 +217,11 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="rounded border border-slate-200 bg-white p-2.5">
                   <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">USD ($) Equivalent</span>
-                  <span className="text-sm font-semibold text-slate-900">{formatUSD(currentPrices.usd || 0)}</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatUSD(Number(currentPrices.usd) || 0)}</span>
                 </div>
                 <div className="rounded border border-slate-200 bg-white p-2.5">
                   <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">CNY (¥) Equivalent</span>
-                  <span className="text-sm font-semibold text-slate-900">{formatCNY(currentPrices.cny || 0)}</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatCNY(Number(currentPrices.cny) || 0)}</span>
                 </div>
               </div>
             </div>
@@ -230,8 +235,8 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
             </label>
             <Input
               type={field.type === 'number' ? 'number' : 'text'}
-              value={value || ''}
-              onChange={e => handleChange(field.name, field.type === 'number' ? Number(e.target.value) : e.target.value)}
+              value={field.type === 'number' ? (value !== undefined && value !== null ? value : '') : (value || '')}
+              onChange={e => handleChange(field.name, field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)}
               placeholder={field.placeholder}
               required={field.required}
             />
