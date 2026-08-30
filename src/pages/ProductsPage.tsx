@@ -147,7 +147,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         search: debouncedSearch,
         page,
         pageSize,
-        newest: true
+        newest: true,
+        hasManifest: true
       });
       setPaginatedData(data);
     } catch (err) {
