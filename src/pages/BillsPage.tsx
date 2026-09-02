@@ -77,7 +77,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const limit = 10;
   const isInitialMount = useRef(true);
   const [expandedBillIds, setExpandedBillIds] = useState<Set<string>>(new Set());
 
@@ -111,7 +111,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
       const data = await billApi.getBills({
         search: debouncedSearch,
         page,
-        pageSize,
+        limit,
       });
       setPaginatedData(data);
     } catch (err) {
@@ -119,7 +119,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
+  }, [debouncedSearch, page, limit, paginatedData.items.length]);
 
   useEffect(() => {
     loadBills();

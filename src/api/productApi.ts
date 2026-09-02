@@ -1,4 +1,5 @@
 import type {
+  BaseResponse,
   PaginatedResponse,
   Product,
   ProductQueryParams,
@@ -52,24 +53,23 @@ export class ProductApi {
 
   async getAll(params?: ProductQueryParams): Promise<PaginatedResponse<Product>> {
     const page = params?.page ?? 1;
-    const pageSize = params?.pageSize ?? 10;
+    const limit = params?.limit ?? 10;
     const search = params?.search ?? '';
-    const hasManifestStr = params?.hasManifest !== undefined ? String(params.hasManifest) : '';
+    const mode = params?.mode ?? '';
 
-    const cacheKey = `${search}_${hasManifestStr}_${page}_${pageSize}`;
+    const cacheKey = `${search}_${mode}_${page}_${limit}`;
 
     if (this._inFlightGetAll.has(cacheKey)) {
       return this._inFlightGetAll.get(cacheKey)!;
     }
 
     const queryParams = new URLSearchParams({
-      includeHidden: 'true',
       page: String(page),
-      pageSize: String(pageSize),
+      limit: String(limit),
     });
 
-    if (params?.hasManifest !== undefined) {
-      queryParams.append('hasManifest', String(params.hasManifest));
+    if (mode) {
+      queryParams.append('mode', mode);
     }
 
     if (params?.newest !== undefined) {
@@ -103,6 +103,7 @@ export class ProductApi {
       name: payload.name,
       imageUrl: payload.imageUrl,
       isDelete: payload.isDelete,
+      disabled: payload.disabled,
       isDenuvo: payload.isDenuvo,
       publisher: payload.publisher,
       categories: payload.categories,
@@ -120,6 +121,7 @@ export class ProductApi {
       name: payload.name,
       imageUrl: payload.imageUrl,
       isDelete: payload.isDelete,
+      disabled: payload.disabled,
       isDenuvo: payload.isDenuvo,
       publisher: payload.publisher,
       categories: payload.categories,
@@ -132,6 +134,36 @@ export class ProductApi {
       { category: category }
     );
     return unwrapResponse(res.data);
+  }
+
+  async updateVisibility(id: string, disabled: boolean): Promise<Product> {
+    const res = await axiosClient.patch(
+      `${this._endpoint}/${id}/visibility`,
+      { value: disabled }
+    );
+    const rawData = unwrapResponse(res.data);
+    return mapRawToProduct(rawData, { id, disabled });
+  }
+
+  async hideProduct(id: string): Promise<BaseResponse<null>> {
+    const res = await axiosClient.patch<BaseResponse<null>>(
+      `${this._endpoint}/${id}/hide`
+    );
+    return res.data;
+  }
+
+  async restoreProduct(id: string): Promise<BaseResponse<null>> {
+    const res = await axiosClient.patch<BaseResponse<null>>(
+      `${this._endpoint}/${id}/restore`
+    );
+    return res.data;
+  }
+
+  async deleteProduct(id: string): Promise<BaseResponse<null>> {
+    const res = await axiosClient.delete<BaseResponse<null>>(
+      `${this._endpoint}/${id}`
+    );
+    return res.data;
   }
 }
 

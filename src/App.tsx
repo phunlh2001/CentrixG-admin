@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { OverviewPage } from '@/pages/OverviewPage';
 import { ProductsPage } from '@/pages/ProductsPage';
 import { WarehousePage } from '@/pages/WarehousePage';
+import { TrashPage } from '@/pages/TrashPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { BillsPage } from '@/pages/BillsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
@@ -20,6 +21,7 @@ const TAB_TITLES: Record<TabType, string> = {
   overview: 'Platform Analytics Overview',
   products: 'Product & Game Catalog Management',
   warehouse: 'Unmanifested Warehouse Catalog',
+  trash: 'Recycle Bin & Deleted Catalog',
   categories: 'Game Category Administration',
   bills: 'Financial Bills & Transactions',
   accounts: 'User & Staff Account Administration',
@@ -148,6 +150,8 @@ function AdminDashboard() {
               {activeTab === 'warehouse' && (
                 <WarehousePage onUpdateProduct={handleUpdateProduct} />
               )}
+
+              {activeTab === 'trash' && (<TrashPage />)}
 
               {activeTab === 'categories' && (
                 <CategoriesPage

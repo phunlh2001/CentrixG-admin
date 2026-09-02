@@ -26,12 +26,16 @@ export interface ProductType {
   name: string;
 }
 
+export type ProductCatalogMode = 'product' | 'warehouse' | 'trash';
+
 export interface ProductQueryParams {
   search?: string;
   page?: number;
-  pageSize?: number;
+  limit?: number;
   hasManifest?: boolean;
   newest?: boolean;
+  isDelete?: boolean;
+  mode?: ProductCatalogMode;
 }
 
 export interface CreateProductDto {

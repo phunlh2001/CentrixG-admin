@@ -37,7 +37,7 @@ axiosClient.interceptors.response.use(
 
 export function unwrapResponse<T>(json: BaseResponse<T> | T): T {
   if (json && typeof json === 'object' && json !== null && 'data' in json && (json as BaseResponse<T>).data !== undefined) {
-    return (json as BaseResponse<T>).data;
+    return (json as BaseResponse<T>).data as T;
   }
   return json as T;
 }

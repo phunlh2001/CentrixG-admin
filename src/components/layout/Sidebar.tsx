@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { LayoutDashboard, Package, Warehouse, FolderKanban, FileText, Users, Gamepad2 } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, Trash2, FolderKanban, FileText, Users, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
-export type TabType = 'overview' | 'products' | 'warehouse' | 'categories' | 'bills' | 'accounts';
+export type TabType = 'overview' | 'products' | 'warehouse' | 'trash' | 'categories' | 'bills' | 'accounts';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: 'categories', label: 'Categories', icon: FolderKanban },
   { id: 'bills', label: 'Bills Management', icon: FileText },
   { id: 'accounts', label: 'Accounts', icon: Users },
+  { id: 'trash', label: 'Trash', icon: Trash2 },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({ activeTab, onTabChange }) => {

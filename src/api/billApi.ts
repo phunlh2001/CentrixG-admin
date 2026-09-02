@@ -11,11 +11,11 @@ export class BillApi extends AdminBaseApi {
 
   async getBills(params?: BillQueryParams): Promise<PaginatedResponse<Bill>> {
     const page = params?.page ?? 1;
-    const pageSize = params?.pageSize ?? 10;
+    const limit = params?.limit ?? 10;
     const search = params?.search ?? '';
     const paymentMethod = params?.paymentMethod ?? '';
 
-    const cacheKey = `${search}_${paymentMethod}_${page}_${pageSize}`;
+    const cacheKey = `${search}_${paymentMethod}_${page}_${limit}`;
 
     if (this._inFlightGetBills.has(cacheKey)) {
       return this._inFlightGetBills.get(cacheKey)!;
@@ -23,7 +23,7 @@ export class BillApi extends AdminBaseApi {
 
     const queryParams = new URLSearchParams({
       page: String(page),
-      pageSize: String(pageSize),
+      limit: String(limit),
     });
 
     if (search) {

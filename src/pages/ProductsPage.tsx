@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle, Trash2, EyeOff, Warehouse } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -107,7 +107,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const limit = 10;
   const isInitialMount = useRef(true);
 
   const [paginatedData, setPaginatedData] = useState<PaginatedResponse<Product>>({
@@ -122,6 +122,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Debounce search input (skip initial mount to prevent duplicate fetch)
@@ -146,9 +147,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
       const data = await productApi.getAll({
         search: debouncedSearch,
         page,
-        pageSize,
+        limit,
         newest: true,
-        hasManifest: true
+        mode: 'product'
       });
       setPaginatedData(data);
     } catch (err) {
@@ -156,7 +157,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
+  }, [debouncedSearch, page, limit, paginatedData.items.length]);
 
   useEffect(() => {
     loadProducts();
@@ -170,6 +171,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         pricing: values.prices || { vnd: 0, usd: 0, cny: 0 },
         imageUrl: values.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=400&auto=format&fit=crop',
         isDelete: false,
+        disabled: Boolean(values.disabled),
         isDenuvo: values.isDenuvo,
         publisher: values.publisher,
         categories: values.categories,
@@ -190,7 +192,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         pricing: values.prices,
         imageUrl: values.imageUrl,
         isDenuvo: Boolean(values.isDenuvo),
-        isDelete: Boolean(values.isDelete),
+        disabled: Boolean(values.disabled),
         categories: values.categories,
       });
       setEditingProduct(null);
@@ -200,29 +202,29 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     }
   }, [editingProduct, onUpdateProduct, loadProducts]);
 
-  const handleToggleDisabled = useCallback(async (product: Product, currentIsDelete: boolean) => {
-    const newIsDelete = !currentIsDelete;
-    // Optimistic UI update for Web Status (disabled/isDelete)
+  const handleToggleDisabled = useCallback(async (product: Product, currentDisabled: boolean) => {
+    const nextDisabled = !currentDisabled;
+    // Optimistic UI update for Visibility (disabled)
     setPaginatedData(prev => ({
       ...prev,
       items: prev.items.map(item =>
-        item.id === product.id ? { ...item, isDelete: newIsDelete, disabled: newIsDelete } : item
+        item.id === product.id ? { ...item, disabled: nextDisabled } : item
       ),
     }));
 
     try {
-      await onUpdateProduct(product.id, { isDelete: newIsDelete });
+      await productApi.updateVisibility(product.id, nextDisabled);
     } catch (err) {
-      console.error('Failed to update product web status:', err);
+      console.error('Failed to update product visibility status:', err);
       // Revert on error
       setPaginatedData(prev => ({
         ...prev,
         items: prev.items.map(item =>
-          item.id === product.id ? { ...item, isDelete: currentIsDelete, disabled: currentIsDelete } : item
+          item.id === product.id ? { ...item, disabled: currentDisabled } : item
         ),
       }));
     }
-  }, [onUpdateProduct]);
+  }, []);
 
   const handleToggleDenuvo = useCallback(async (product: Product, currentDenuvo: boolean) => {
     const newDenuvo = !currentDenuvo;
@@ -273,6 +275,28 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     }
   }, [loadProducts]);
 
+  const handleConfirmHideProduct = useCallback(async () => {
+    if (!deletingProduct) return;
+    setIsSubmitting(true);
+    try {
+      // Optimistic UI update: remove from current list
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.filter(item => item.id !== deletingProduct.id),
+        total: Math.max(0, prev.total - 1),
+      }));
+
+      await productApi.hideProduct(deletingProduct.id);
+      setDeletingProduct(null);
+      await loadProducts(true);
+    } catch (err) {
+      console.error('Failed to hide/soft-delete product:', err);
+      await loadProducts(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [deletingProduct, loadProducts]);
+
   // Memoized Table Rows
   const tableRows = useMemo(() => {
     if (loading && paginatedData.items.length === 0) {
@@ -302,7 +326,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     }
 
     return paginatedData.items.map(product => (
-      <TableRow key={product.id} className={product.isDelete ? 'bg-slate-50/70' : ''}>
+      <TableRow key={product.id} className={product.disabled ? 'bg-slate-50/70 opacity-80' : ''}>
         <TableCell className="font-medium">
           <div className="flex items-center gap-3">
             <img
@@ -327,19 +351,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         <TableCell>
           <div className="flex items-center gap-2">
             <Switch
-              checked={!product.isDelete}
-              onCheckedChange={() => handleToggleDisabled(product, product.isDelete)}
+              checked={!product.disabled}
+              onCheckedChange={() => handleToggleDisabled(product, Boolean(product.disabled))}
             />
-            <Badge variant={!product.isDelete ? 'active' : 'disabled'}>
-              {!product.isDelete ? 'Displayed on Web' : 'Disabled (Hidden)'}
+            <Badge variant={!product.disabled ? 'active' : 'disabled'}>
+              {!product.disabled ? 'Displayed on Web' : 'Disabled (Hidden)'}
             </Badge>
           </div>
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
             <Switch
-              checked={product.isDenuvo}
-              onCheckedChange={() => handleToggleDenuvo(product, product.isDenuvo)}
+              checked={Boolean(product.isDenuvo)}
+              onCheckedChange={() => handleToggleDenuvo(product, Boolean(product.isDenuvo))}
             />
           </div>
         </TableCell>
@@ -379,15 +403,27 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
           </div>
         </TableCell>
         <TableCell className="text-right">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setEditingProduct(product)}
-            className="h-8 gap-1"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            Edit Details
-          </Button>
+          <div className="flex items-center justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingProduct(product)}
+              className="h-8 gap-1"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeletingProduct(product)}
+              className="h-8 gap-1 border-amber-300 text-amber-800 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-900 font-medium transition-colors"
+              title="Delete from store and move to warehouse"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-amber-700" />
+              Remove
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
     ));
@@ -498,7 +534,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
                 name: editingProduct.name,
                 prices: editingProduct.pricing,
                 imageUrl: editingProduct.imageUrl,
-                disabled: editingProduct.isDelete,
+                disabled: editingProduct.disabled,
                 isDenuvo: editingProduct.isDenuvo,
               }}
               onSubmit={handleEditSubmit}
@@ -507,6 +543,46 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
               isSubmitting={isSubmitting}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete / Move to Warehouse Confirmation Dialog */}
+      <Dialog open={Boolean(deletingProduct)} onOpenChange={(open) => !open && setDeletingProduct(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-900">
+              <Warehouse className="w-5 h-5 text-amber-700" />
+              Remove Game to Trash
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-slate-600 text-xs leading-relaxed">
+                <p>
+                  Are you sure you want to delete <strong>{deletingProduct?.name}</strong> from the Store catalog?
+                </p>
+                <div className="p-3 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <span>ℹ️ Catalog Notice</span>
+                  </div>
+                  <div>
+                    This action will <strong>remove this game from the active Store</strong> and <strong>push it to the Trash tab</strong>. It can still be managed and re-added to the Store later.
+                  </div>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeletingProduct(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleConfirmHideProduct}
+              disabled={isSubmitting}
+              className="bg-amber-700 text-white hover:bg-amber-800 font-medium"
+            >
+              {isSubmitting ? 'Moving...' : 'Confirm & Move to Trash'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

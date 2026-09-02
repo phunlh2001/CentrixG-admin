@@ -39,5 +39,5 @@ export interface BillQueryParams {
   search?: string;
   paymentMethod?: string;
   page?: number;
-  pageSize?: number;
+  limit?: number;
 }

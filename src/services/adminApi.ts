@@ -46,15 +46,15 @@
 //       searchName?: string;
 //       includeHidden?: boolean;
 //       page?: number;
-//       pageSize?: number;
+//       limit?: number;
 //     },
 //     forceRefresh = false
 //   ): Promise<PaginatedResponse<Product>> {
 //     const page = params.page || 1;
-//     const pageSize = params.pageSize || 10;
+//     const limit = params.limit || 10;
 //     const includeHidden = params.includeHidden ?? true;
 //     const search = params.searchName || '';
-//     const cacheKey = `${search}_${includeHidden}_${page}_${pageSize}`;
+//     const cacheKey = `${search}_${includeHidden}_${page}_${limit}`;
 
 //     // Return cached product response if available and no force refresh requested
 //     if (!forceRefresh && productsCache[cacheKey]) {
@@ -65,7 +65,7 @@
 //       const queryParams = new URLSearchParams({
 //         includeHidden: String(includeHidden),
 //         page: String(page),
-//         pageSize: String(pageSize),
+//         limit: String(limit),
 //       });
 //       if (search) {
 //         queryParams.append('search', search);
@@ -79,13 +79,13 @@
 
 //       const items: Product[] = data.items;
 //       const total = items.length;
-//       const totalPages = Math.ceil(total / pageSize) || 1;
+//       const totalPages = Math.ceil(total / limit) || 1;
 
 //       const result: PaginatedResponse<Product> = {
 //         items,
 //         total,
 //         page,
-//         limit: pageSize,
+//         limit: limit,
 //         totalPages,
 //       };
 

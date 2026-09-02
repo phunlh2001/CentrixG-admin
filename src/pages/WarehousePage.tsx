@@ -3,10 +3,10 @@ import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, Warehouse, Boxes, AlertCircle, Download } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, Warehouse, Boxes, AlertCircle, Download, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 import { Switch } from '@/components/ui/switch';
@@ -44,6 +44,13 @@ const EDIT_PRODUCT_FORM_SCHEMA: DynamicFormFieldSchema[] = [
     required: true,
   },
   {
+    name: 'disabled',
+    label: 'Display on Web',
+    type: 'toggle',
+    description: 'Enable to show game on store frontend; toggle off to set disabled/hidden flag.',
+    defaultValue: false,
+  },
+  {
     name: 'isDenuvo',
     label: 'Denuvo',
     type: 'toggle',
@@ -58,7 +65,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const limit = 10;
   const isInitialMount = useRef(true);
 
   const [paginatedData, setPaginatedData] = useState<PaginatedResponse<Product>>({
@@ -72,6 +79,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
   const [updatingCategoryId, setUpdatingCategoryId] = useState<string | null>(null);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Debounce search input
@@ -95,8 +103,8 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
       const data = await productApi.getAll({
         search: debouncedSearch,
         page,
-        pageSize,
-        hasManifest: false, // Filter for unmanifested products
+        limit,
+        mode: 'warehouse',
       });
       setPaginatedData(data);
     } catch (err) {
@@ -104,7 +112,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page, pageSize, paginatedData.items.length]);
+  }, [debouncedSearch, page, limit, paginatedData.items.length]);
 
   useEffect(() => {
     loadWarehouseProducts();
@@ -119,7 +127,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
         pricing: values.prices,
         imageUrl: values.imageUrl,
         isDenuvo: Boolean(values.isDenuvo),
-        isDelete: Boolean(values.isDelete),
+        disabled: Boolean(values.disabled),
       });
       setEditingProduct(null);
       await loadWarehouseProducts(true);
@@ -176,6 +184,28 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
       setUpdatingCategoryId(null);
     }
   }, [loadWarehouseProducts]);
+
+  const handleConfirmRemoveProduct = useCallback(async () => {
+    if (!deletingProduct) return;
+    setIsSubmitting(true);
+    try {
+      // Optimistic UI update: remove from warehouse table
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.filter(item => item.id !== deletingProduct.id),
+        total: Math.max(0, prev.total - 1),
+      }));
+
+      await productApi.hideProduct(deletingProduct.id);
+      setDeletingProduct(null);
+      await loadWarehouseProducts(true);
+    } catch (err) {
+      console.error('Failed to remove warehouse product:', err);
+      await loadWarehouseProducts(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [deletingProduct, loadWarehouseProducts]);
 
   // Export list of App IDs to exports.txt file (123\n456\n789)
   const handleExportAppIds = useCallback(() => {
@@ -240,7 +270,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     }
 
     return paginatedData.items.map(product => (
-      <TableRow key={product.id} className={product.isDelete ? 'bg-slate-50/70' : ''}>
+      <TableRow key={product.id} className={product.disabled ? 'bg-slate-50/70 opacity-80' : ''}>
         {/* 1. App ID */}
         <TableCell className="font-mono text-xs font-semibold text-slate-700">
           <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 inline-block">
@@ -314,15 +344,15 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
         <TableCell>
           <div className="flex items-center gap-2">
             <Switch
-              checked={product.isDenuvo}
-              onCheckedChange={() => handleToggleDenuvo(product, product.isDenuvo)}
+              checked={Boolean(product.isDenuvo)}
+              onCheckedChange={() => handleToggleDenuvo(product, Boolean(product.isDenuvo))}
             />
           </div>
         </TableCell>
 
         {/* 6. Actions */}
         <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-1.5">
             <Button
               size="sm"
               variant="outline"
@@ -331,6 +361,16 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
             >
               <Edit2 className="w-3.5 h-3.5" />
               Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeletingProduct(product)}
+              className="h-8 gap-1 border-amber-300 text-amber-800 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-900 font-medium transition-colors"
+              title="Remove game to trash"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-amber-700" />
+              Remove
             </Button>
           </div>
         </TableCell>
@@ -436,7 +476,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
                 name: editingProduct.name,
                 prices: editingProduct.pricing,
                 imageUrl: editingProduct.imageUrl,
-                disabled: !editingProduct.isDelete,
+                disabled: editingProduct.disabled,
                 isDenuvo: editingProduct.isDenuvo,
               }}
               onSubmit={handleEditSubmit}
@@ -445,6 +485,46 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
               isSubmitting={isSubmitting}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Warehouse Product Confirmation Dialog */}
+      <Dialog open={Boolean(deletingProduct)} onOpenChange={(open) => !open && setDeletingProduct(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-900 font-bold">
+              <Trash2 className="w-5 h-5 text-amber-700" />
+              Remove Game to Trash
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-slate-600 text-xs leading-relaxed">
+                <p>
+                  Are you sure you want to remove <strong>{deletingProduct?.name}</strong> (#{deletingProduct?.appId}) to the Trash?
+                </p>
+                <div className="p-3 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5 text-amber-800">
+                    <span>ℹ️ Trash Archive Notice</span>
+                  </div>
+                  <div>
+                    This item will be <strong>moved to the Trash tab</strong>. You can restore it later from the Trash tab or delete it permanently.
+                  </div>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeletingProduct(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleConfirmRemoveProduct}
+              disabled={isSubmitting}
+              className="bg-amber-700 text-white hover:bg-amber-800 font-medium"
+            >
+              {isSubmitting ? 'Removing...' : 'Confirm & Move to Trash'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
