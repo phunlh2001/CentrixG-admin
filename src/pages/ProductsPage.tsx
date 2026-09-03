@@ -171,7 +171,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         pricing: values.prices || { vnd: 0, usd: 0, cny: 0 },
         imageUrl: values.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=400&auto=format&fit=crop',
         isDelete: false,
-        disabled: Boolean(values.disabled),
         isDenuvo: values.isDenuvo,
         publisher: values.publisher,
         categories: values.categories,
