@@ -5,8 +5,9 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Crown, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Boxes } from 'lucide-react';
+import { Crown, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Boxes, RotateCcw } from 'lucide-react';
 import billApi from '@/api/billApi';
 
 interface BillsPageProps {
@@ -50,6 +51,13 @@ const getStatusBadge = (status?: string) => {
           FAILED
         </span>
       );
+    case 'REFUNDED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+          REFUNDED
+        </span>
+      );
     default:
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200 shadow-xs">
@@ -89,6 +97,8 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     totalPages: 1,
   });
   const [loading, setLoading] = useState(false);
+  const [refundingBill, setRefundingBill] = useState<Bill | null>(null);
+  const [isRefunding, setIsRefunding] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -137,12 +147,35 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     });
   }, []);
 
+  const handleConfirmRefund = useCallback(async () => {
+    if (!refundingBill) return;
+    setIsRefunding(true);
+    try {
+      // Optimistic update: set bill status to REFUNDED
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item.id === refundingBill.id ? { ...item, orderStatus: 'REFUNDED' } : item
+        ),
+      }));
+
+      await billApi.refundBill(refundingBill.id);
+      setRefundingBill(null);
+      await loadBills(true);
+    } catch (err) {
+      console.error('Failed to refund bill:', err);
+      await loadBills(true);
+    } finally {
+      setIsRefunding(false);
+    }
+  }, [refundingBill, loadBills]);
+
   // Memoized Table Rows
   const tableRows = useMemo(() => {
     if (loading && paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={8} className="h-32 text-center text-xs text-slate-400">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               Loading financial bills...
@@ -155,7 +188,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
     if (paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={8} className="h-32 text-center text-xs text-slate-400">
             <div className="flex flex-col items-center justify-center gap-1.5 py-4">
               <AlertCircle className="w-5 h-5 text-slate-300" />
               <span>No transaction bills found</span>
@@ -170,6 +203,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
       const isExpanded = expandedBillIds.has(bill.id);
       const firstProduct = products[0];
       const hasMultiple = products.length > 1;
+      const isCompleted = bill.orderStatus?.toUpperCase() === 'COMPLETED';
 
       return (
         <React.Fragment key={bill.id}>
@@ -244,23 +278,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
               {getStatusBadge(bill.orderStatus)}
             </TableCell>
 
-            {/* 5. Referrer Info */}
-            <TableCell>
-              {bill.referrerInfo ? (
-                <div className="space-y-0.5">
-                  <Badge variant="outline" className="bg-amber-50/80 text-amber-800 border-amber-200 text-[10px] font-mono">
-                    {bill.referrerInfo.code || bill.referrerInfo.username}
-                  </Badge>
-                  <div className="text-[10px] text-slate-400 font-mono">{bill.referrerInfo.email}</div>
-                </div>
-              ) : (
-                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-[10px] font-mono">
-                  DIRECT
-                </Badge>
-              )}
-            </TableCell>
-
-            {/* 6. Payment Amount */}
+            {/* 5. Payment Amount */}
             <TableCell>
               <div className="text-xs font-extrabold text-slate-900">
                 {formatVND(bill.paymentAmount?.vnd ?? 0)}
@@ -270,16 +288,34 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
               </div>
             </TableCell>
 
-            {/* 7. Date & Time */}
-            <TableCell className="text-right text-xs text-slate-500 font-mono">
+            {/* 6. Date & Time */}
+            <TableCell className="text-xs text-slate-500 font-mono">
               {bill.createdAt ? new Date(bill.createdAt).toLocaleString() : '—'}
+            </TableCell>
+
+            {/* 7. Actions (Refund) */}
+            <TableCell className="text-right">
+              {isCompleted ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRefundingBill(bill)}
+                  className="h-7 px-2.5 gap-1 text-xs border-purple-300 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 font-medium transition-colors"
+                  title="Refund this completed bill"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-purple-600" />
+                  Refund
+                </Button>
+              ) : (
+                <span className="text-xs text-slate-300 font-mono">—</span>
+              )}
             </TableCell>
           </TableRow>
 
           {/* Expanded Multi-Product Minimalist Drawer Sub-Row */}
           {isExpanded && (
             <TableRow className="bg-slate-50/70 border-b border-slate-200">
-              <TableCell colSpan={7} className="p-0">
+              <TableCell colSpan={8} className="p-0">
                 <div className="p-4 sm:px-6 border-t border-dashed border-slate-200 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
@@ -348,7 +384,7 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-                      Top Customer of the Month
+                       Top Customer of the Month
                     </span>
                     <Badge variant="outline" className="border-amber-400 text-amber-300 text-[10px]">
                       Highest Transactions
@@ -408,9 +444,9 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
             <TableHead>Product Info</TableHead>
             <TableHead>User Account</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Referrer Info</TableHead>
             <TableHead>Payment Amount</TableHead>
-            <TableHead className="text-right">Date & Time</TableHead>
+            <TableHead>Date & Time</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -453,6 +489,47 @@ export const BillsPage: React.FC<BillsPageProps> = React.memo(({ topPayer }) => 
           </Button>
         </div>
       </div>
+
+      {/* Refund Confirmation Dialog */}
+      <Dialog open={Boolean(refundingBill)} onOpenChange={(open) => !open && setRefundingBill(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-900 font-bold">
+              <RotateCcw className="w-5 h-5 text-purple-700" />
+              Process Bill Refund
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-slate-600 text-xs leading-relaxed">
+                <p>
+                  Are you sure you want to refund bill <strong>#{refundingBill?.id.slice(0, 8)}</strong> for customer <strong>{refundingBill?.userAccount?.username}</strong>?
+                </p>
+                <div className="p-3 rounded-md bg-purple-50 border border-purple-200 text-purple-900 text-xs space-y-1">
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>Refund Amount:</span>
+                    <span className="font-bold text-purple-950">{formatVND(refundingBill?.paymentAmount?.vnd ?? 0)}</span>
+                  </div>
+                  <div className="text-[11px] text-purple-800 pt-1">
+                    This action will mark the bill status as <strong>REFUNDED</strong>.
+                  </div>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setRefundingBill(null)} disabled={isRefunding}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleConfirmRefund}
+              disabled={isRefunding}
+              className="bg-purple-700 text-white hover:bg-purple-800 font-medium"
+            >
+              {isRefunding ? 'Processing...' : 'Confirm Refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

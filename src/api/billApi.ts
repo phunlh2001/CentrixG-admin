@@ -1,6 +1,6 @@
 import AdminBaseApi from "./adminBaseApi";
 import { axiosClient, unwrapResponse } from "./axiosClient";
-import type { Bill, BillQueryParams, PaginatedResponse } from "@/types";
+import type { BaseResponse, Bill, BillQueryParams, PaginatedResponse } from "@/types";
 
 export class BillApi extends AdminBaseApi {
   private _inFlightGetBills: Map<string, Promise<PaginatedResponse<Bill>>> = new Map();
@@ -44,6 +44,13 @@ export class BillApi extends AdminBaseApi {
 
     this._inFlightGetBills.set(cacheKey, fetchPromise);
     return fetchPromise;
+  }
+
+  async refundBill(id: string): Promise<BaseResponse<null>> {
+    const res = await axiosClient.patch<BaseResponse<null>>(
+      `${this._endpoint}/refund/${id}`
+    );
+    return res.data;
   }
 }
 
