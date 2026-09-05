@@ -165,6 +165,16 @@ export class ProductApi {
     );
     return res.data;
   }
+
+  async bulkDelete(productIds: string[]): Promise<BaseResponse<null>> {
+    const res = await axiosClient.delete<BaseResponse<null>>(
+      `${this._endpoint}/bulk`,
+      {
+        data: { productIds },
+      }
+    );
+    return res.data;
+  }
 }
 
 const productApi = new ProductApi();

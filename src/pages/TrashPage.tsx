@@ -25,6 +25,9 @@ export const TrashPage: React.FC = React.memo(() => {
   });
   const [loading, setLoading] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+
   const [restoringProduct, setRestoringProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,6 +68,45 @@ export const TrashPage: React.FC = React.memo(() => {
     loadTrashProducts();
   }, [debouncedSearch, page]);
 
+  // Selection logic for checkboxes
+  const isAllSelected = useMemo(() => {
+    if (paginatedData.items.length === 0) return false;
+    return paginatedData.items.every(item => selectedIds.has(item.id));
+  }, [paginatedData.items, selectedIds]);
+
+  const isSomeSelected = useMemo(() => {
+    if (isAllSelected || paginatedData.items.length === 0) return false;
+    return paginatedData.items.some(item => selectedIds.has(item.id));
+  }, [paginatedData.items, selectedIds, isAllSelected]);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        paginatedData.items.forEach(item => next.delete(item.id));
+      } else {
+        paginatedData.items.forEach(item => next.add(item.id));
+      }
+      return next;
+    });
+  }, [isAllSelected, paginatedData.items]);
+
+  const handleSelectOne = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
   const handleConfirmRestore = useCallback(async () => {
     if (!restoringProduct) return;
     setIsSubmitting(true);
@@ -75,6 +117,11 @@ export const TrashPage: React.FC = React.memo(() => {
         items: prev.items.filter(item => item.id !== restoringProduct.id),
         total: Math.max(0, prev.total - 1),
       }));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(restoringProduct.id);
+        return next;
+      });
 
       await productApi.restoreProduct(restoringProduct.id);
       setRestoringProduct(null);
@@ -97,6 +144,11 @@ export const TrashPage: React.FC = React.memo(() => {
         items: prev.items.filter(item => item.id !== deletingProduct.id),
         total: Math.max(0, prev.total - 1),
       }));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(deletingProduct.id);
+        return next;
+      });
 
       await productApi.deleteProduct(deletingProduct.id);
       setDeletingProduct(null);
@@ -108,6 +160,30 @@ export const TrashPage: React.FC = React.memo(() => {
       setIsSubmitting(false);
     }
   }, [deletingProduct, loadTrashProducts]);
+
+  const handleConfirmBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setIsSubmitting(true);
+    const idsToDelete = Array.from(selectedIds);
+    try {
+      // Optimistic removal from trash list
+      setPaginatedData(prev => ({
+        ...prev,
+        items: prev.items.filter(item => !selectedIds.has(item.id)),
+        total: Math.max(0, prev.total - selectedIds.size),
+      }));
+
+      await productApi.bulkDelete(idsToDelete);
+      setSelectedIds(new Set());
+      setIsBulkModalOpen(false);
+      await loadTrashProducts(true);
+    } catch (err) {
+      console.error('Failed to bulk delete products:', err);
+      await loadTrashProducts(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedIds, loadTrashProducts]);
 
   // Memoized header notice banner
   const headerBanner = useMemo(() => (
@@ -130,7 +206,7 @@ export const TrashPage: React.FC = React.memo(() => {
     if (loading && paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               Loading trash catalog...
@@ -143,7 +219,7 @@ export const TrashPage: React.FC = React.memo(() => {
     if (paginatedData.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
             <div className="flex flex-col items-center justify-center gap-1.5 py-4">
               <AlertCircle className="w-5 h-5 text-slate-300" />
               <span>Trash is empty. No deleted products found.</span>
@@ -153,84 +229,99 @@ export const TrashPage: React.FC = React.memo(() => {
       );
     }
 
-    return paginatedData.items.map(product => (
-      <TableRow key={product.id} className="bg-slate-50/50">
-        {/* 1. App ID */}
-        <TableCell className="font-mono text-xs font-semibold text-slate-700">
-          <span className="px-2 py-1 rounded-md bg-slate-200/70 border border-slate-300 inline-block">
-            {product.appId ? `#${product.appId}` : `#${product.id.slice(0, 8)}`}
-          </span>
-        </TableCell>
+    return paginatedData.items.map(product => {
+      const isSelected = selectedIds.has(product.id);
 
-        {/* 2. Game Info */}
-        <TableCell className="font-medium">
-          <div className="flex items-center gap-3">
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="w-10 h-10 rounded-md object-cover border border-slate-200 opacity-80 shrink-0"
+      return (
+        <TableRow key={product.id} className={isSelected ? 'bg-rose-50/40' : 'bg-slate-50/50'}>
+          {/* Checkbox Column */}
+          <TableCell className="w-10">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => handleSelectOne(product.id)}
+              className="w-4 h-4 rounded border-slate-300 text-slate-900 accent-slate-900 focus:ring-slate-400 cursor-pointer"
+              aria-label={`Select ${product.name}`}
             />
-            <div>
-              <div className="text-slate-900 font-semibold text-s decoration-slate-400">
-                {product.name}
+          </TableCell>
+
+          {/* 1. App ID */}
+          <TableCell className="font-mono text-xs font-semibold text-slate-700">
+            <span className="px-2 py-1 rounded-md bg-slate-200/70 border border-slate-300 inline-block">
+              {product.appId ? `#${product.appId}` : `#${product.id.slice(0, 8)}`}
+            </span>
+          </TableCell>
+
+          {/* 2. Game Info */}
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-3">
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="w-10 h-10 rounded-md object-cover border border-slate-200 opacity-80 shrink-0"
+              />
+              <div>
+                <div className="text-slate-900 font-semibold text-sm decoration-slate-400">
+                  {product.name}
+                </div>
+                {product.publisher && (
+                  <div className="text-xs text-slate-400">{product.publisher}</div>
+                )}
               </div>
-              {product.publisher && (
-                <div className="text-xs text-slate-400">{product.publisher}</div>
-              )}
             </div>
-          </div>
-        </TableCell>
+          </TableCell>
 
-        {/* 3. Prices */}
-        <TableCell>
-          <div className="text-xs font-bold text-slate-700">{formatVND(Number(product.pricing.vnd))}</div>
-          <div className="text-[11px] text-slate-500">
-            {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
-          </div>
-        </TableCell>
+          {/* 3. Prices */}
+          <TableCell>
+            <div className="text-xs font-bold text-slate-700">{formatVND(Number(product.pricing.vnd))}</div>
+            <div className="text-[11px] text-slate-500">
+              {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
+            </div>
+          </TableCell>
 
-        {/* 4. Category Type */}
-        <TableCell>
-          <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-            {product.type?.name || 'Unassigned'}
-          </span>
-        </TableCell>
+          {/* 4. Category Type */}
+          <TableCell>
+            <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+              {product.type?.name || 'Unassigned'}
+            </span>
+          </TableCell>
 
-        {/* 5. Status Badge */}
-        <TableCell>
-          <Badge variant="banned">
-            Deleted (In Trash)
-          </Badge>
-        </TableCell>
+          {/* 5. Status Badge */}
+          <TableCell>
+            <Badge variant="banned">
+              Deleted (In Trash)
+            </Badge>
+          </TableCell>
 
-        {/* 6. Actions */}
-        <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setRestoringProduct(product)}
-              className="h-8 gap-1 border-emerald-300 text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100 hover:text-emerald-900 font-medium transition-colors"
-              title="Restore game to catalog"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
-              Restore
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setDeletingProduct(product)}
-              className="h-8 gap-1 font-medium"
-              title="Delete permanently from database"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete
-            </Button>
-          </div>
-        </TableCell>
-      </TableRow>
-    ));
-  }, [loading, paginatedData.items]);
+          {/* 6. Actions */}
+          <TableCell className="text-right">
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setRestoringProduct(product)}
+                className="h-8 gap-1 border-emerald-300 text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100 hover:text-emerald-900 font-medium transition-colors"
+                title="Restore game to catalog"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                Restore
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setDeletingProduct(product)}
+                className="h-8 gap-1 font-medium"
+                title="Delete permanently from database"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    });
+  }, [loading, paginatedData.items, selectedIds, handleSelectOne]);
 
   return (
     <div className="space-y-6">
@@ -251,10 +342,49 @@ export const TrashPage: React.FC = React.memo(() => {
         </div>
       </div>
 
+      {/* Bulk Selection Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between p-3 rounded-lg border border-rose-200 bg-rose-50/90 text-rose-900 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-xs text-rose-950">
+              {selectedIds.size} {selectedIds.size === 1 ? 'item' : 'items'} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleDeselectAll}
+              className="text-[11px] underline text-rose-700 hover:text-rose-900 cursor-pointer font-medium ml-2"
+            >
+              Deselect all
+            </button>
+          </div>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setIsBulkModalOpen(true)}
+            className="h-8 gap-1.5 font-medium shadow-xs"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Selected ({selectedIds.size})
+          </Button>
+        </div>
+      )}
+
       {/* Trash Products Table */}
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                ref={el => {
+                  if (el) el.indeterminate = isSomeSelected;
+                }}
+                onChange={handleSelectAll}
+                className="w-4 h-4 rounded border-slate-300 text-slate-900 accent-slate-900 focus:ring-slate-400 cursor-pointer"
+                aria-label="Select all products on page"
+              />
+            </TableHead>
             <TableHead className="w-28">App ID</TableHead>
             <TableHead>Game Info</TableHead>
             <TableHead>Prices</TableHead>
@@ -344,7 +474,7 @@ export const TrashPage: React.FC = React.memo(() => {
         </DialogContent>
       </Dialog>
 
-      {/* Permanent Delete Product Confirmation Dialog */}
+      {/* Permanent Delete Single Product Confirmation Dialog */}
       <Dialog open={Boolean(deletingProduct)} onOpenChange={(open) => !open && setDeletingProduct(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -378,6 +508,45 @@ export const TrashPage: React.FC = React.memo(() => {
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Deleting...' : 'Delete Forever'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Products Confirmation Dialog */}
+      <Dialog open={isBulkModalOpen} onOpenChange={(open) => !open && setIsBulkModalOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 font-bold">
+              <Trash2 className="w-5 h-5 text-rose-600" />
+              Permanently Delete Selected Items
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-slate-600 text-xs leading-relaxed">
+                <p>
+                  Are you sure you want to permanently delete <strong>{selectedIds.size} selected games</strong> from the system?
+                </p>
+                <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5 text-rose-700">
+                    <span>⚠️ Irreversible Action</span>
+                  </div>
+                  <div>
+                    All {selectedIds.size} items will be <strong>permanently erased from the database</strong> along with manifests, prices, and DLCs. This action cannot be undone.
+                  </div>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsBulkModalOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmBulkDelete}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Deleting...' : `Delete ${selectedIds.size} Items Forever`}
             </Button>
           </DialogFooter>
         </DialogContent>
