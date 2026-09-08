@@ -11,19 +11,19 @@ import type {
 import { axiosClient, unwrapResponse } from './axiosClient';
 
 function mapRawToProduct(rawData: RawProductResponse, fallback?: Partial<Product>): Product {
-  let pricing: MultiCurrencyPrice;
-  if (typeof rawData.pricing === 'number') {
-    pricing = {
-      vnd: String(rawData.pricing),
-      usd: String(Math.round((rawData.pricing / 25000) * 100) / 100),
-      cny: String(Math.round((rawData.pricing / 3500) * 100) / 100),
+  let prices: MultiCurrencyPrice;
+  if (typeof rawData.prices === 'number') {
+    prices = {
+      vnd: String(rawData.prices),
+      usd: String(Math.round((rawData.prices / 25000) * 100) / 100),
+      cny: String(Math.round((rawData.prices / 3500) * 100) / 100),
     };
-  } else if (rawData.pricing && typeof rawData.pricing === 'object') {
-    pricing = rawData.pricing;
-  } else if (fallback?.pricing) {
-    pricing = fallback.pricing;
+  } else if (rawData.prices && typeof rawData.prices === 'object') {
+    prices = rawData.prices;
+  } else if (fallback?.prices) {
+    prices = fallback.prices;
   } else {
-    pricing = { vnd: '0', usd: '0', cny: '0' };
+    prices = { vnd: '0', usd: '0', cny: '0' };
   }
 
   return {
@@ -31,7 +31,7 @@ function mapRawToProduct(rawData: RawProductResponse, fallback?: Partial<Product
     appId: rawData.appId ?? fallback?.appId,
     hasManifest: rawData.hasManifest ?? fallback?.hasManifest ?? false,
     name: rawData.name || fallback?.name || '',
-    pricing,
+    prices,
     isDelete: rawData.isDelete ?? fallback?.isDelete ?? false,
     disabled: rawData.disabled ?? fallback?.disabled ?? false,
     categories: rawData.categories || fallback?.categories || [],

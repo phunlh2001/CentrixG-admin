@@ -40,7 +40,7 @@ export interface ProductQueryParams {
 
 export interface CreateProductDto {
   name: string;
-  pricing: number | MultiCurrencyPrice;
+  prices: number | MultiCurrencyPrice;
   disabled?: boolean;
   isDelete?: boolean;
   imageUrl?: string;
@@ -51,7 +51,7 @@ export interface CreateProductDto {
 
 export interface UpdateProductDto {
   name?: string;
-  pricing?: number | MultiCurrencyPrice;
+  prices?: number | MultiCurrencyPrice;
   disabled?: boolean;
   isDelete?: boolean;
   imageUrl?: string;
@@ -65,7 +65,7 @@ export interface RawProductResponse {
   appId?: number;
   hasManifest?: boolean;
   name?: string;
-  pricing?: MultiCurrencyPrice;
+  prices?: MultiCurrencyPrice;
   isDelete?: boolean;
   disabled: boolean;
   categories?: string[];
