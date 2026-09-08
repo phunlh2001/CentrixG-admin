@@ -273,9 +273,9 @@ export const TrashPage: React.FC = React.memo(() => {
 
           {/* 3. Prices */}
           <TableCell>
-            <div className="text-xs font-bold text-slate-700">{formatVND(Number(product.pricing.vnd))}</div>
+            <div className="text-xs font-bold text-slate-700">{formatVND(Number(product.prices.vnd))}</div>
             <div className="text-[11px] text-slate-500">
-              {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
+              {formatUSD(Number(product.prices.usd))} • {formatCNY(Number(product.prices.cny))}
             </div>
           </TableCell>
 

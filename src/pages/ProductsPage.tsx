@@ -168,7 +168,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     try {
       await onCreateProduct({
         name: values.name,
-        pricing: values.prices || { vnd: 0, usd: 0, cny: 0 },
+        prices: values.prices || { vnd: 0, usd: 0, cny: 0 },
         imageUrl: values.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=400&auto=format&fit=crop',
         isDelete: false,
         isDenuvo: values.isDenuvo,
@@ -188,7 +188,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     try {
       await onUpdateProduct(editingProduct.id, {
         name: values.name,
-        pricing: values.prices,
+        prices: values.prices,
         imageUrl: values.imageUrl,
         isDenuvo: Boolean(values.isDenuvo),
         disabled: Boolean(values.disabled),
@@ -342,9 +342,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
           </div>
         </TableCell>
         <TableCell>
-          <div className="text-xs font-bold text-slate-900">{formatVND(Number(product.pricing.vnd))}</div>
+          <div className="text-xs font-bold text-slate-900">{formatVND(Number(product.prices.vnd))}</div>
           <div className="text-[11px] text-slate-500">
-            {formatUSD(Number(product.pricing.usd))} • {formatCNY(Number(product.pricing.cny))}
+            {formatUSD(Number(product.prices.usd))} • {formatCNY(Number(product.prices.cny))}
           </div>
         </TableCell>
         <TableCell>
@@ -531,7 +531,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
               fields={EDIT_PRODUCT_FORM_SCHEMA}
               initialValues={{
                 name: editingProduct.name,
-                prices: editingProduct.pricing,
+                prices: editingProduct.prices,
                 imageUrl: editingProduct.imageUrl,
                 disabled: editingProduct.disabled,
                 isDenuvo: editingProduct.isDenuvo,
