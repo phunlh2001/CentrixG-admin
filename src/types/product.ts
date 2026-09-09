@@ -27,6 +27,7 @@ export interface ProductType {
 }
 
 export type ProductCatalogMode = 'product' | 'warehouse' | 'trash';
+export type OrderByPrice = 'asc' | 'desc';
 
 export interface ProductQueryParams {
   search?: string;
@@ -36,6 +37,7 @@ export interface ProductQueryParams {
   newest?: boolean;
   isDelete?: boolean;
   mode?: ProductCatalogMode;
+  orderByPrice?: OrderByPrice;
 }
 
 export interface CreateProductDto {

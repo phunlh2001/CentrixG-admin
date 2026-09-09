@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types';
+import type { Product, DynamicFormFieldSchema, PaginatedResponse, OrderByPrice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, Warehouse, Boxes, AlertCircle, Download, Trash2 } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, Warehouse, Boxes, AlertCircle, Download, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 import { Switch } from '@/components/ui/switch';
@@ -65,6 +65,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [orderByPrice, setOrderByPrice] = useState<OrderByPrice | undefined>(undefined);
   const limit = 10;
   const isInitialMount = useRef(true);
 
@@ -95,6 +96,15 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     return () => clearTimeout(timer);
   }, [search]);
 
+  const handleToggleOrderByPrice = useCallback(() => {
+    setOrderByPrice(prev => {
+      if (!prev) return 'asc';
+      if (prev === 'asc') return 'desc';
+      return undefined;
+    });
+    setPage(1);
+  }, []);
+
   const loadWarehouseProducts = useCallback(async (forceRefresh = false) => {
     if (paginatedData.items.length === 0 || forceRefresh) {
       setLoading(true);
@@ -105,6 +115,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
         page,
         limit,
         mode: 'warehouse',
+        orderByPrice,
       });
       setPaginatedData(data);
     } catch (err) {
@@ -112,11 +123,11 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page, limit, paginatedData.items.length]);
+  }, [debouncedSearch, page, limit, paginatedData.items.length, orderByPrice]);
 
   useEffect(() => {
     loadWarehouseProducts();
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, orderByPrice]);
 
   const handleEditSubmit = useCallback(async (values: Record<string, any>) => {
     if (!editingProduct) return;
@@ -384,7 +395,7 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
 
       {/* Top Action & Search Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <Input
@@ -394,6 +405,39 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
               className="pl-9 bg-white"
             />
           </div>
+
+          {/* Quick Price Sort Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleToggleOrderByPrice}
+            className={`h-9 px-3 gap-1.5 font-medium transition-all text-xs border ${
+              orderByPrice === 'asc'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:text-emerald-900'
+                : orderByPrice === 'desc'
+                ? 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100 hover:text-indigo-900'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Toggle sort by price: Default -> Low to High -> High to Low -> Default"
+          >
+            {orderByPrice === 'asc' ? (
+              <>
+                <ArrowUp className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Price: Low → High</span>
+              </>
+            ) : orderByPrice === 'desc' ? (
+              <>
+                <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Price: High → Low</span>
+              </>
+            ) : (
+              <>
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                <span>Sort by Price</span>
+              </>
+            )}
+          </Button>
         </div>
 
         <Button
@@ -413,7 +457,23 @@ export const WarehousePage: React.FC<WarehousePageProps> = React.memo(({
           <TableRow>
             <TableHead className="w-28">App ID</TableHead>
             <TableHead>Game Info</TableHead>
-            <TableHead>Prices (VND / USD / CNY)</TableHead>
+            <TableHead>
+              <button
+                type="button"
+                onClick={handleToggleOrderByPrice}
+                className="flex items-center gap-1.5 hover:text-slate-900 cursor-pointer transition-colors group font-semibold text-slate-700"
+                title="Click to sort by price"
+              >
+                <span>Prices</span>
+                {orderByPrice === 'asc' ? (
+                  <ArrowUp className="w-3.5 h-3.5 text-emerald-600" />
+                ) : orderByPrice === 'desc' ? (
+                  <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                ) : (
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+                )}
+              </button>
+            </TableHead>
             <TableHead>Category / Type</TableHead>
             <TableHead>Denuvo</TableHead>
             <TableHead className="text-right">Actions</TableHead>

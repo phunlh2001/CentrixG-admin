@@ -56,8 +56,9 @@ export class ProductApi {
     const limit = params?.limit ?? 10;
     const search = params?.search ?? '';
     const mode = params?.mode ?? '';
+    const orderByPrice = params?.orderByPrice ?? '';
 
-    const cacheKey = `${search}_${mode}_${page}_${limit}`;
+    const cacheKey = `${search}_${mode}_${orderByPrice}_${page}_${limit}`;
 
     if (this._inFlightGetAll.has(cacheKey)) {
       return this._inFlightGetAll.get(cacheKey)!;
@@ -70,6 +71,10 @@ export class ProductApi {
 
     if (mode) {
       queryParams.append('mode', mode);
+    }
+
+    if (orderByPrice) {
+      queryParams.append('orderByPrice', orderByPrice);
     }
 
     if (params?.newest !== undefined) {

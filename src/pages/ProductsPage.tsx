@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Product, DynamicFormFieldSchema, PaginatedResponse } from '@/types';
+import type { Product, DynamicFormFieldSchema, PaginatedResponse, OrderByPrice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -7,7 +7,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle, Trash2, EyeOff, Warehouse } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle, Trash2, EyeOff, Warehouse, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -107,6 +107,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [orderByPrice, setOrderByPrice] = useState<OrderByPrice | undefined>(undefined);
   const limit = 10;
   const isInitialMount = useRef(true);
 
@@ -138,6 +139,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     return () => clearTimeout(timer);
   }, [search]);
 
+  const handleToggleOrderByPrice = useCallback(() => {
+    setOrderByPrice(prev => {
+      if (!prev) return 'asc';
+      if (prev === 'asc') return 'desc';
+      return undefined;
+    });
+    setPage(1);
+  }, []);
+
   const loadProducts = useCallback(async (forceRefresh = false) => {
     // Only show full loading UI if we have no items cached or forceRefresh requested
     if (paginatedData.items.length === 0 || forceRefresh) {
@@ -149,7 +159,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         page,
         limit,
         newest: true,
-        mode: 'product'
+        mode: 'product',
+        orderByPrice,
       });
       setPaginatedData(data);
     } catch (err) {
@@ -157,11 +168,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page, limit, paginatedData.items.length]);
+  }, [debouncedSearch, page, limit, paginatedData.items.length, orderByPrice]);
 
   useEffect(() => {
     loadProducts();
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, orderByPrice]);
 
   const handleCreateSubmit = useCallback(async (values: Record<string, any>) => {
     setIsSubmitting(true);
@@ -442,6 +453,39 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
               className="pl-9 bg-white"
             />
           </div>
+
+          {/* Sort by Price Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleToggleOrderByPrice}
+            className={`h-9 px-3 gap-1.5 text-xs font-semibold shrink-0 transition-all ${
+              orderByPrice === 'asc'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                : orderByPrice === 'desc'
+                ? 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Toggle sort by price: Default -> Low to High -> High to Low -> Default"
+          >
+            {orderByPrice === 'asc' ? (
+              <>
+                <ArrowUp className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Price: Low → High</span>
+              </>
+            ) : orderByPrice === 'desc' ? (
+              <>
+                <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Price: High → Low</span>
+              </>
+            ) : (
+              <>
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                <span>Sort by Price</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -450,7 +494,23 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
         <TableHeader>
           <TableRow>
             <TableHead>Game Info</TableHead>
-            <TableHead>Prices (VND / USD / CNY)</TableHead>
+            <TableHead>
+              <button
+                type="button"
+                onClick={handleToggleOrderByPrice}
+                className="flex items-center gap-1.5 hover:text-slate-900 cursor-pointer transition-colors group font-semibold text-slate-700"
+                title="Click to sort by price"
+              >
+                <span>Prices</span>
+                {orderByPrice === 'asc' ? (
+                  <ArrowUp className="w-3.5 h-3.5 text-emerald-600" />
+                ) : orderByPrice === 'desc' ? (
+                  <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                ) : (
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+                )}
+              </button>
+            </TableHead>
             <TableHead>Web Status</TableHead>
             <TableHead>Denuvo</TableHead>
             <TableHead>Category / Type</TableHead>
