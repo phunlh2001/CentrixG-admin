@@ -1,5 +1,5 @@
 import { axiosClient, unwrapResponse } from "./axiosClient";
-import type { UserAccount, BanUserDto, RoleUpdateType, UpdateUserRoleDto } from "@/types";
+import type { UserAccount, BanUserDto, RoleUpdateType, UpdateUserRoleDto, GetAllUsersQueryDto } from "@/types";
 
 export class UserApi {
   private readonly _endpoint: string;
@@ -8,8 +8,8 @@ export class UserApi {
     this._endpoint = '/user';
   }
 
-  async getAllUsers(): Promise<UserAccount[]> {
-    const res = await axiosClient.get(this._endpoint);
+  async getAllUsers(query?: GetAllUsersQueryDto): Promise<UserAccount[]> {
+    const res = await axiosClient.get(this._endpoint, { params: query });
     return unwrapResponse(res.data);
   }
 

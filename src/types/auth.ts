@@ -13,8 +13,15 @@ export interface UserAccount {
   role: string;
   isBlock: boolean;
   resonable?: string | null;
+  offerCode?: string | null;
+  totalEarn?: number | null;
   createdAt: string;
   name?: string;
+}
+
+export interface GetAllUsersQueryDto {
+  month?: number;
+  year?: number;
 }
 
 export interface BanUserDto {

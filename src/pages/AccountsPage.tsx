@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { ShieldAlert, Mail, Ban, Search, ShieldCheck, Eye, RefreshCw, Loader2, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import userApi from '@/api/userApi';
+import { formatVND } from '@/lib/utils';
 
 interface AccountsPageProps {
   users?: UserAccount[];
@@ -41,6 +42,31 @@ const getRoleBadge = (role?: string) => {
   }
 };
 
+const MONTH_OPTIONS = [
+  { label: 'All Time (Total)', value: '' },
+  { label: 'January (01)', value: '1' },
+  { label: 'February (02)', value: '2' },
+  { label: 'March (03)', value: '3' },
+  { label: 'April (04)', value: '4' },
+  { label: 'May (05)', value: '5' },
+  { label: 'June (06)', value: '6' },
+  { label: 'July (07)', value: '7' },
+  { label: 'August (08)', value: '8' },
+  { label: 'September (09)', value: '9' },
+  { label: 'October (10)', value: '10' },
+  { label: 'November (11)', value: '11' },
+  { label: 'December (12)', value: '12' },
+];
+
+const CURRENT_DATE = new Date();
+const CURRENT_MONTH = CURRENT_DATE.getMonth() + 1;
+const CURRENT_YEAR = CURRENT_DATE.getFullYear();
+const YEAR_OPTIONS = [
+  CURRENT_YEAR - 1,
+  CURRENT_YEAR,
+  CURRENT_YEAR + 1,
+];
+
 export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
   onBanUser: externalBanUser,
   onUnbanUser: externalUnbanUser,
@@ -55,59 +81,86 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
   const [emailPreviewUser, setEmailPreviewUser] = useState<{ user: UserAccount; reason?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [selectedMonth, setSelectedMonth] = useState<number | undefined>(CURRENT_MONTH);
+  const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
+
   const loadUsers = useCallback(async (forceRefresh = false) => {
     if (users.length === 0 || forceRefresh) {
       setLoading(true);
     }
     try {
-      const data = await userApi.getAllUsers();
+      const query = selectedMonth !== undefined ? { month: selectedMonth, year: selectedYear } : undefined;
+      const data = await userApi.getAllUsers(query);
       setUsers(data);
     } catch (err) {
       console.error('Failed fetching users:', err);
     } finally {
       setLoading(false);
     }
-  }, [users.length]);
+  }, [users.length, selectedMonth, selectedYear]);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadUsers(true);
+  }, [selectedMonth, selectedYear]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u =>
       (u.username && u.username.toLowerCase().includes(search.toLowerCase())) ||
       (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
-      (u.role && u.role.toLowerCase().includes(search.toLowerCase()))
+      (u.role && u.role.toLowerCase().includes(search.toLowerCase())) ||
+      (u.offerCode && u.offerCode.toLowerCase().includes(search.toLowerCase()))
     );
   }, [users, search]);
 
   const handleUpdateRole = useCallback(async (user: UserAccount, targetType: 'promote' | 'demote') => {
-    const previousRole = user.role;
+    const previousUser = user;
     const nextRole = targetType === 'promote' ? 'SELLER' : 'CUSTOMER';
     setUpdatingRoleUserId(user.id);
 
-    // Optimistic UI update
+    // Optimistic UI update: update role immediately and clear offerCode on demote
     setUsers(prev =>
       prev.map(u =>
-        u.id === user.id ? { ...u, role: nextRole } : u
+        u.id === user.id
+          ? {
+              ...u,
+              role: nextRole,
+              offerCode: targetType === 'demote' ? null : u.offerCode,
+            }
+          : u
       )
     );
 
     try {
-      await userApi.updateUserRole(user.id, targetType);
+      const updatedUser = await userApi.updateUserRole(user.id, targetType);
+      if (updatedUser && typeof updatedUser === 'object' && 'id' in updatedUser) {
+        // Smoothly re-render both role and offerCode columns with the updated user data
+        setUsers(prev =>
+          prev.map(u =>
+            u.id === user.id
+              ? {
+                  ...u,
+                  ...updatedUser,
+                }
+              : u
+          )
+        );
+      } else {
+        // Fallback silent sync without full screen loading flicker
+        const freshUsers = await userApi.getAllUsers();
+        setUsers(freshUsers);
+      }
     } catch (err) {
       console.error(`Failed to ${targetType} user role:`, err);
-      // Revert on error
+      // Revert to previous state on error
       setUsers(prev =>
         prev.map(u =>
-          u.id === user.id ? { ...u, role: previousRole } : u
+          u.id === user.id ? previousUser : u
         )
       );
-      await loadUsers(true);
     } finally {
       setUpdatingRoleUserId(null);
     }
-  }, [loadUsers]);
+  }, []);
 
   const handleConfirmBan = useCallback(async () => {
     if (!banModalUser) return;
@@ -176,7 +229,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     if (loading && users.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={8} className="h-32 text-center text-xs text-slate-400">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               Loading registered user accounts...
@@ -189,7 +242,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     if (filteredUsers.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+          <TableCell colSpan={8} className="h-32 text-center text-xs text-slate-400">
             <div className="flex flex-col items-center justify-center gap-1.5 py-4">
               <AlertCircle className="w-5 h-5 text-slate-300" />
               <span>No user accounts found</span>
@@ -273,12 +326,29 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           )}
         </TableCell>
 
-        {/* 5. Ban Reason */}
-        <TableCell className="text-xs text-slate-600 max-w-xs truncate">
-          {user.resonable || '—'}
+        {/* 5. Offer Code */}
+        <TableCell>
+          {user.offerCode ? (
+            <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+              {user.offerCode}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 font-mono">—</span>
+          )}
         </TableCell>
 
-        {/* 6. Created At */}
+        {/* 6. Total Earn (VND) */}
+        <TableCell>
+          {user.role?.toUpperCase() === 'SELLER' ? (
+            <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+              {formatVND(Number(user.totalEarn ?? 0))}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 font-mono">—</span>
+          )}
+        </TableCell>
+
+        {/* 7. Created At */}
         <TableCell className="text-xs text-slate-500 font-mono">
           {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
         </TableCell>
@@ -326,15 +396,47 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     <div className="space-y-6">
       {/* Search and Filters Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <Input
-              placeholder="Search accounts by name, email, or role..."
+              placeholder="Search accounts by name, email, role, or offer code..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 bg-white"
             />
+          </div>
+
+          {/* Month Filter */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={selectedMonth !== undefined ? String(selectedMonth) : ''}
+              onChange={e => setSelectedMonth(e.target.value ? Number(e.target.value) : undefined)}
+              className="h-9 px-3 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer"
+              title="Filter seller earnings by month"
+            >
+              {MONTH_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Year Filter (active when month is selected) */}
+            {selectedMonth !== undefined && (
+              <select
+                value={selectedYear}
+                onChange={e => setSelectedYear(Number(e.target.value))}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer"
+                title="Filter by year"
+              >
+                {YEAR_OPTIONS.map(year => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <Button
@@ -363,7 +465,8 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
             <TableHead>Role</TableHead>
             <TableHead>Role Management</TableHead>
             <TableHead>Account Status</TableHead>
-            <TableHead>Ban Reason (if any)</TableHead>
+            <TableHead>Offer Code</TableHead>
+            <TableHead>Total Earn (VND)</TableHead>
             <TableHead>Created At</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
