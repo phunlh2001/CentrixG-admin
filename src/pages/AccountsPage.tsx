@@ -117,14 +117,13 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
     const nextRole = targetType === 'promote' ? 'SELLER' : 'CUSTOMER';
     setUpdatingRoleUserId(user.id);
 
-    // Optimistic UI update: update role immediately and clear offerCode on demote
+    // Optimistic UI update: update role immediately while retaining offerCode for disabled styling
     setUsers(prev =>
       prev.map(u =>
         u.id === user.id
           ? {
               ...u,
               role: nextRole,
-              offerCode: targetType === 'demote' ? null : u.offerCode,
             }
           : u
       )
@@ -329,9 +328,18 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
         {/* 5. Offer Code */}
         <TableCell>
           {user.offerCode ? (
-            <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-              {user.offerCode}
-            </span>
+            user.role?.toUpperCase() === 'SELLER' ? (
+              <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                {user.offerCode}
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 border border-slate-200 line-through opacity-75 cursor-not-allowed"
+                title="Offer code disabled (Customer account)"
+              >
+                {user.offerCode}
+              </span>
+            )
           ) : (
             <span className="text-xs text-slate-400 font-mono">—</span>
           )}
