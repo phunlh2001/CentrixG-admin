@@ -271,46 +271,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           {getRoleBadge(user.role)}
         </TableCell>
 
-        {/* 3. Role Action (Promote / Demote) */}
-        <TableCell>
-          {user.role?.toUpperCase() === 'CUSTOMER' ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={updatingRoleUserId === user.id || user.isBlock}
-              onClick={() => handleUpdateRole(user, 'promote')}
-              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-sky-200 text-sky-700 bg-sky-50/50 hover:bg-sky-100 hover:text-sky-800 transition-colors"
-              title="Promote to Seller"
-            >
-              {updatingRoleUserId === user.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <ArrowUpCircle className="w-3.5 h-3.5 text-sky-600" />
-              )}
-              Promote
-            </Button>
-          ) : user.role?.toUpperCase() === 'SELLER' ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={updatingRoleUserId === user.id || user.isBlock}
-              onClick={() => handleUpdateRole(user, 'demote')}
-              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100 hover:text-purple-800 transition-colors"
-              title="Demote to Customer"
-            >
-              {updatingRoleUserId === user.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <ArrowDownCircle className="w-3.5 h-3.5 text-purple-600" />
-              )}
-              Demote
-            </Button>
-          ) : (
-            <span className="text-xs text-slate-400 font-mono">—</span>
-          )}
-        </TableCell>
-
-        {/* 4. Account Status */}
+        {/* 3. Account Status */}
         <TableCell>
           {user.isBlock ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
@@ -325,7 +286,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           )}
         </TableCell>
 
-        {/* 5. Offer Code */}
+        {/* 4. Offer Code */}
         <TableCell>
           {user.offerCode ? (
             user.role?.toUpperCase() === 'SELLER' ? (
@@ -345,7 +306,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           )}
         </TableCell>
 
-        {/* 6. Total Earn (VND) */}
+        {/* 5. Total Earn (VND) */}
         <TableCell>
           {user.role?.toUpperCase() === 'SELLER' ? (
             <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -356,7 +317,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           )}
         </TableCell>
 
-        {/* 7. Created At */}
+        {/* 6. Created At */}
         <TableCell className="text-xs text-slate-500 font-mono">
           {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
         </TableCell>
@@ -471,7 +432,6 @@ export const AccountsPage: React.FC<AccountsPageProps> = React.memo(({
           <TableRow>
             <TableHead>User Account</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Role Management</TableHead>
             <TableHead>Account Status</TableHead>
             <TableHead>Offer Code</TableHead>
             <TableHead>Total Earn (VND)</TableHead>

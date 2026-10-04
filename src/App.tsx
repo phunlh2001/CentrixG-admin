@@ -8,6 +8,7 @@ import { TrashPage } from '@/pages/TrashPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { BillsPage } from '@/pages/BillsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
+import { AffiliatesPage } from '@/pages/AffiliatesPage';
 import { LoginPage } from '@/pages/LoginPage';
 import type { Product, UserAccount, Category, OverviewMetrics } from '@/types';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -24,6 +25,7 @@ const TAB_TITLES: Record<TabType, string> = {
   trash: 'Recycle Bin & Deleted Catalog',
   categories: 'Game Category Administration',
   bills: 'Financial Bills & Transactions',
+  affiliates: 'Affiliate Partner Applications',
   accounts: 'User & Staff Account Administration',
 };
 
@@ -161,6 +163,7 @@ function AdminDashboard() {
                 />
               )}
               {activeTab === 'bills' && <BillsPage topPayer={topPayer} />}
+              {activeTab === 'affiliates' && <AffiliatesPage />}
               {activeTab === 'accounts' && <AccountsPage />}
             </>
           )}

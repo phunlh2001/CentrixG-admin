@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { LayoutDashboard, Package, Warehouse, Trash2, FolderKanban, FileText, Users, Gamepad2 } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, Trash2, FolderKanban, FileText, Users, Gamepad2, Handshake } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
-export type TabType = 'overview' | 'products' | 'warehouse' | 'trash' | 'categories' | 'bills' | 'accounts';
+export type TabType = 'overview' | 'products' | 'warehouse' | 'trash' | 'categories' | 'bills' | 'affiliates' | 'accounts';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
   { id: 'categories', label: 'Categories', icon: FolderKanban },
   { id: 'bills', label: 'Bills Management', icon: FileText },
+  { id: 'affiliates', label: 'Affiliates', icon: Handshake },
   { id: 'accounts', label: 'Accounts', icon: Users },
   { id: 'trash', label: 'Trash', icon: Trash2 },
 ];
