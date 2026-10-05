@@ -1,59 +1,77 @@
-import { getStoredAuthToken } from '@/lib/helper';
+import { getStoredAuthToken, parseJwtToken } from '@/lib/helper';
 import { axiosClient } from '../api/axiosClient';
-import type { LoginCredentials, BaseResponse, LoginData, AuthTokenData, AuthUser } from '@/types';
+import type { LoginCredentials, BaseResponse, AuthTokenData, AuthTokensDto, AuthUser } from '@/types';
 
 const AUTH_STORAGE_KEY = 'centrix_admin_auth';
 
 export const authService = {
-  async login(credentials: LoginCredentials): Promise<LoginData> {
-    const response = await axiosClient.post<BaseResponse<LoginData> | LoginData>('/auth/login', {
+  async login(credentials: LoginCredentials): Promise<AuthTokenData> {
+    const response = await axiosClient.post<BaseResponse<AuthTokensDto> | AuthTokensDto>('/auth/login', {
       email: credentials.email,
       password: credentials.password,
     });
-    
-    // Support both wrapped BaseResponse<LoginData> and flat LoginData
+
+    // Support both wrapped BaseResponse<AuthTokensDto> and flat AuthTokensDto
     const resBody = response.data;
-    const loginData: LoginData = ('data' in resBody && resBody.data && (resBody.data as any).accessToken)
-      ? (resBody.data as LoginData)
-      : (resBody as LoginData);
+    const tokens: AuthTokensDto = ('data' in resBody && resBody.data && (resBody.data as any).accessToken)
+      ? (resBody.data as AuthTokensDto)
+      : (resBody as AuthTokensDto);
+
+    if (!tokens || !tokens.accessToken) {
+      throw new Error('Authentication response did not contain an access token.');
+    }
+
+    // Parse user profile from JWT accessToken payload
+    const user = parseJwtToken(tokens.accessToken);
+    if (!user) {
+      throw new Error('Failed to decode user credentials from token.');
+    }
 
     // Enforce role requirement: Only ADMIN and MOD roles are authorized
-    const role = loginData?.user?.role?.toUpperCase();
+    const role = user.role?.toUpperCase();
     if (!role || (role !== 'ADMIN' && role !== 'MOD')) {
       throw new Error('Access forbidden: Only ADMIN and MOD roles can access this platform.');
     }
-    
-    if (loginData && loginData.accessToken) {
-      this.saveAuthSession(loginData);
-    }
-    
-    return loginData;
+
+    const savedAuth = this.saveAuthSession(tokens, user);
+    return savedAuth;
   },
 
-  saveAuthSession(data: LoginData): AuthTokenData {
+  saveAuthSession(tokens: AuthTokensDto, user: AuthUser): AuthTokenData {
     // Calculate expiration timestamp (buffer 10 seconds for safety)
-    const expiresIn = data.expiresIn || 900;
+    const expiresIn = tokens.expiresIn || 900;
     const expiresAt = Date.now() + Math.max(expiresIn - 10, 60) * 1000;
     const tokenData: AuthTokenData = {
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       expiresAt,
-      user: data.user,
+      user,
     };
-    
+
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokenData));
     return tokenData;
   },
 
   getCurrentAuth(): AuthTokenData | null {
     const authData = getStoredAuthToken();
-    if (!authData || !authData.user) return null;
-    const role = authData.user.role?.toUpperCase();
+    if (!authData || !authData.accessToken) return null;
+
+    const user = authData.user || parseJwtToken(authData.accessToken);
+    if (!user) {
+      this.logout();
+      return null;
+    }
+
+    const role = user.role?.toUpperCase();
     if (role !== 'ADMIN' && role !== 'MOD') {
       this.logout();
       return null;
     }
-    return authData;
+
+    return {
+      ...authData,
+      user,
+    };
   },
 
   getCurrentUser(): AuthUser | null {

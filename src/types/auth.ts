@@ -47,14 +47,13 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface LoginData {
+export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
-  user: AuthUser;
 }
 
-export type LoginResponse = BaseResponse<LoginData>;
+export type LoginResponse = BaseResponse<AuthTokensDto>;
 
 export interface AuthTokenData {
   accessToken: string;
