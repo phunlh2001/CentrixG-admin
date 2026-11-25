@@ -7,7 +7,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DynamicForm } from '@/components/ui/DynamicForm';
 import { formatVND, formatUSD, formatCNY } from '@/lib/utils';
-import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle, Trash2, EyeOff, Warehouse, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Edit2, Search, ChevronLeft, ChevronRight, Tag, Loader2, ChevronDown, AlertCircle, Trash2, Warehouse, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import productApi from '@/api/productApi';
 
@@ -485,6 +485,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = React.memo(({
                 <span>Sort by Price</span>
               </>
             )}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => loadProducts(true)}
+            disabled={loading}
+            className="h-9 px-3 shrink-0 cursor-pointer"
+            title="Reload products"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
